@@ -21,11 +21,12 @@ export async function abrirBancoIndexedDb(nome: string): Promise<Banco> {
 export class BancoSqlJs implements Banco {
   private timer: ReturnType<typeof setTimeout> | null = null;
   private emTransacao = false;
+  private readonly db: Database;
+  private readonly persistir: (dados: Uint8Array) => Promise<void>;
 
-  constructor(
-    private readonly db: Database,
-    private readonly persistir: (dados: Uint8Array) => Promise<void>,
-  ) {
+  constructor(db: Database, persistir: (dados: Uint8Array) => Promise<void>) {
+    this.db = db;
+    this.persistir = persistir;
     if (typeof document !== 'undefined') {
       // Grava na hora se o app for para segundo plano, para não perder a última alteração.
       document.addEventListener('visibilitychange', () => {

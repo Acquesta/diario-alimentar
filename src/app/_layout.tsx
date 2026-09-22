@@ -3,6 +3,7 @@ import { StatusBar } from 'expo-status-bar';
 import { ActivityIndicator, Platform, View } from 'react-native';
 import { TemaProvider, useTema } from '@/components/ui';
 import { BancoProvider } from '@/lib/banco';
+import { ContaProvider } from '@/lib/conta';
 
 // Na web, pede ao navegador para não apagar os dados do app por falta de espaço ou de uso.
 if (Platform.OS === 'web' && typeof navigator !== 'undefined') {
@@ -19,7 +20,9 @@ export default function Layout() {
       }
     >
       <TemaProvider>
-        <Navegacao />
+        <ContaProvider>
+          <Navegacao />
+        </ContaProvider>
       </TemaProvider>
     </BancoProvider>
   );
@@ -52,6 +55,8 @@ function Navegacao() {
         <Stack.Screen name="perfil" options={{ title: 'Meu perfil e meta' }} />
         <Stack.Screen name="novo-alimento" options={{ title: 'Novo alimento' }} />
         <Stack.Screen name="prato" options={{ title: 'Prato' }} />
+        <Stack.Screen name="privacidade" options={{ title: 'Privacidade' }} />
+        <Stack.Screen name="apagar-conta" options={{ title: 'Apagar conta e dados' }} />
       </Stack>
     </>
   );

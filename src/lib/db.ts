@@ -1,11 +1,11 @@
 import type { Banco } from './banco-tipos';
 import type { Alimento, Origem, Refeicao } from './foods';
-import { porcao, type Macros, type Perfil } from './nutrition';
+import { porcao, type Macros, type Perfil } from './nutrition.ts';
 
 /** Todo acesso ao banco passa por aqui, para facilitar trocar o armazenamento se precisar. */
 
 export const NOME_BANCO = 'diario.db';
-const VERSAO = 3;
+export const VERSAO = 3;
 
 export async function migrar(db: Banco): Promise<void> {
   const linha = await db.getFirstAsync<{ user_version: number }>('PRAGMA user_version');

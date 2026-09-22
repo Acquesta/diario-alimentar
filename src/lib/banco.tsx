@@ -4,7 +4,7 @@ import { Platform, Text, View } from 'react-native';
 import type { Banco, TipoArmazenamento } from './banco-tipos';
 import { migrar, NOME_BANCO } from './db';
 
-type Estado = { banco: Banco; tipo: TipoArmazenamento };
+type Estado = { banco: Banco; tipo: TipoArmazenamento; aoAlterar: (fn: () => void) => () => void };
 
 const BancoContexto = createContext<Estado | null>(null);
 
@@ -22,7 +22,7 @@ export function BancoProvider({ children, carregando }: { children: ReactNode; c
 
   useEffect(() => {
     abrirBanco()
-      .then(setEstado)
+      .then(({ banco, tipo }) => setEstado({ tipo, ...comAvisos(banco) }))
       .catch((e) => setErro(e instanceof Error ? e.message : String(e)));
   }, []);
 
@@ -47,13 +47,38 @@ export function useTipoArmazenamento(): TipoArmazenamento {
   return usarEstado().tipo;
 }
 
+/** Assina alterações no banco (para o backup automático). Retorna a função que cancela. */
+export function useAoAlterar(): Estado['aoAlterar'] {
+  return usarEstado().aoAlterar;
+}
+
 function usarEstado(): Estado {
   const estado = useContext(BancoContexto);
   if (!estado) throw new Error('useBanco precisa estar dentro de BancoProvider');
   return estado;
 }
 
-async function abrirBanco(): Promise<Estado> {
+/** Envolve o banco para avisar quem assinou sempre que algo for gravado. */
+function comAvisos(original: Banco): Pick<Estado, 'banco' | 'aoAlterar'> {
+  const ouvintes = new Set<() => void>();
+  const avisar = () => ouvintes.forEach((fn) => fn());
+  const banco: Banco = {
+    execAsync: (sql) => original.execAsync(sql).finally(avisar),
+    runAsync: (sql, ...params) => original.runAsync(sql, ...params).finally(avisar),
+    getFirstAsync: (sql, ...params) => original.getFirstAsync(sql, ...params),
+    getAllAsync: (sql, ...params) => original.getAllAsync(sql, ...params),
+    withTransactionAsync: (fn) => original.withTransactionAsync(fn),
+  };
+  return {
+    banco,
+    aoAlterar: (fn) => {
+      ouvintes.add(fn);
+      return () => ouvintes.delete(fn);
+    },
+  };
+}
+
+async function abrirBanco(): Promise<Omit<Estado, 'aoAlterar'>> {
   if (Platform.OS !== 'web') {
     const banco = await openDatabaseAsync(NOME_BANCO);
     await migrar(banco);

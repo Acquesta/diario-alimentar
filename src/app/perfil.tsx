@@ -4,6 +4,7 @@ import { useBanco, useTipoArmazenamento } from '@/lib/banco';
 import { useCallback, useState } from 'react';
 import { ScrollView, Text, TextInput, View } from 'react-native';
 import { Botao, Cartao, Chip, useTema, type PreferenciaTema } from '@/components/ui';
+import { CartaoConta } from '@/components/conta';
 import { lerPerfil, salvarPerfil } from '@/lib/db';
 import { metaCalculada, metaDiaria, type Atividade, type Objetivo, type Perfil, type Sexo } from '@/lib/nutrition';
 
@@ -146,10 +147,12 @@ export default function TelaPerfil() {
           ))}
         </View>
         <Text style={estilos.suave}>
-          Seus dados ficam só neste aparelho ({armazenamento === 'sqlite' ? 'SQLite' : 'modo compatível, IndexedDB'}).
+          Seus dados ficam neste aparelho ({armazenamento === 'sqlite' ? 'SQLite' : 'modo compatível, IndexedDB'}).
         </Text>
         <Text style={estilos.suave}>Muda na hora. “Automático” segue o modo claro ou escuro do celular.</Text>
       </Cartao>
+
+      <CartaoConta />
 
       <Botao
         titulo="Salvar"
