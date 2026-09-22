@@ -1,11 +1,13 @@
 import type { Banco } from './banco-tipos';
 import type { Alimento, Origem, Refeicao } from './foods';
 import { porcao, type Macros, type Perfil } from './nutrition.ts';
+import type { Foco, Intensidade, TipoExercicio } from './exercicios.ts';
+import { agora } from './dates.ts';
 
 /** Todo acesso ao banco passa por aqui, para facilitar trocar o armazenamento se precisar. */
 
 export const NOME_BANCO = 'diario.db';
-export const VERSAO = 3;
+export const VERSAO = 5;
 
 export async function migrar(db: Banco): Promise<void> {
   const linha = await db.getFirstAsync<{ user_version: number }>('PRAGMA user_version');
@@ -87,6 +89,44 @@ export async function migrar(db: Banco): Promise<void> {
       );
       CREATE INDEX IF NOT EXISTS idx_prato_itens_prato ON prato_itens (prato_id);
     `);
+  }
+
+  if (atual < 4) {
+    // Água e exercícios (entrega 2). O gasto do treino fica gravado no registro,
+    // para o histórico não mudar se o peso do perfil mudar depois.
+    await db.execAsync(`
+      CREATE TABLE IF NOT EXISTS agua (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        data TEXT NOT NULL,
+        ml REAL NOT NULL,
+        criado_em TEXT NOT NULL DEFAULT (datetime('now'))
+      );
+      CREATE INDEX IF NOT EXISTS idx_agua_data ON agua (data);
+      CREATE TABLE IF NOT EXISTS exercicios (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        data TEXT NOT NULL,
+        tipo TEXT NOT NULL,
+        intensidade TEXT,
+        minutos REAL,
+        distancia_km REAL,
+        kcal REAL NOT NULL,
+        criado_em TEXT NOT NULL DEFAULT (datetime('now'))
+      );
+      CREATE INDEX IF NOT EXISTS idx_exercicios_data ON exercicios (data);
+    `);
+    // Código de barras do produto, para reencontrar o alimento na próxima leitura.
+    const colunas = await db.getAllAsync<{ name: string }>('PRAGMA table_info(alimentos_personalizados)');
+    if (!colunas.some((c) => c.name === 'codigo_barras')) {
+      await db.execAsync('ALTER TABLE alimentos_personalizados ADD COLUMN codigo_barras TEXT');
+    }
+  }
+
+  if (atual < 5) {
+    // Foco do treino de musculação (composto ou isolado), que muda o gasto.
+    const colunas = await db.getAllAsync<{ name: string }>('PRAGMA table_info(exercicios)');
+    if (!colunas.some((c) => c.name === 'foco')) {
+      await db.execAsync('ALTER TABLE exercicios ADD COLUMN foco TEXT');
+    }
   }
 
   await db.execAsync(`PRAGMA user_version = ${VERSAO}`);
@@ -216,6 +256,28 @@ export async function salvarConfig(db: Banco, chave: string, valor: string): Pro
   );
 }
 
+// Peso
+
+/**
+ * O peso fica guardado à parte do perfil completo, em `config`.
+ * Água e exercícios só precisam dele, e não faz sentido exigir idade e altura
+ * (que só servem para calcular a meta de calorias) para eles funcionarem.
+ */
+const CHAVE_PESO = 'peso_kg';
+
+export async function salvarPeso(db: Banco, pesoKg: number): Promise<void> {
+  await salvarConfig(db, CHAVE_PESO, String(pesoKg));
+}
+
+export async function lerPeso(db: Banco): Promise<number | null> {
+  const valor = await lerConfig(db, CHAVE_PESO);
+  const n = valor ? Number(valor) : NaN;
+  if (Number.isFinite(n) && n > 0) return n;
+  // Quem já tinha perfil antes desta versão não tem o peso em `config`.
+  const linha = await db.getFirstAsync<{ peso_kg: number }>('SELECT peso_kg FROM perfil WHERE id = 1');
+  return linha?.peso_kg ?? null;
+}
+
 // Perfil
 
 type PerfilLinha = {
@@ -243,6 +305,7 @@ export async function lerPerfil(db: Banco): Promise<Perfil | null> {
 }
 
 export async function salvarPerfil(db: Banco, p: Perfil): Promise<void> {
+  await salvarPeso(db, p.pesoKg);
   await db.runAsync(
     `INSERT INTO perfil (id, sexo, idade, altura_cm, peso_kg, atividade, objetivo, meta_manual)
      VALUES (1, ?, ?, ?, ?, ?, ?, ?)
@@ -265,13 +328,101 @@ export async function listarPersonalizados(db: Banco): Promise<Alimento[]> {
 
 export async function criarPersonalizado(
   db: Banco,
-  a: Macros & { nome: string },
+  a: Macros & { nome: string; codigoBarras?: string | null },
 ): Promise<Alimento> {
   const r = await db.runAsync(
-    'INSERT INTO alimentos_personalizados (nome, kcal, proteina, carboidrato, gordura) VALUES (?, ?, ?, ?, ?)',
-    a.nome, a.kcal, a.proteina, a.carboidrato, a.gordura,
+    'INSERT INTO alimentos_personalizados (nome, kcal, proteina, carboidrato, gordura, codigo_barras) VALUES (?, ?, ?, ?, ?, ?)',
+    a.nome, a.kcal, a.proteina, a.carboidrato, a.gordura, a.codigoBarras ?? null,
   );
   return { ...a, id: r.lastInsertRowId, origem: 'custom', categoria: 'Meus alimentos' };
+}
+
+/** Alimento já cadastrado com este código de barras, para não pedir os valores de novo. */
+export async function personalizadoPorCodigo(db: Banco, codigo: string): Promise<Alimento | null> {
+  const l = await db.getFirstAsync<Omit<Alimento, 'origem' | 'categoria'>>(
+    'SELECT id, nome, kcal, proteina, carboidrato, gordura FROM alimentos_personalizados WHERE codigo_barras = ?',
+    codigo,
+  );
+  return l ? { ...l, origem: 'custom', categoria: 'Meus alimentos' } : null;
+}
+
+// Água
+
+export type RegistroAgua = { id: number; data: string; ml: number; criado_em: string };
+
+export async function listarAgua(db: Banco, data: string): Promise<RegistroAgua[]> {
+  return db.getAllAsync<RegistroAgua>(
+    'SELECT id, data, ml, criado_em FROM agua WHERE data = ? ORDER BY id',
+    data,
+  );
+}
+
+export async function registrarAgua(db: Banco, data: string, ml: number): Promise<void> {
+  // A hora fica no fuso do aparelho; o datetime('now') do SQLite grava em UTC.
+  await db.runAsync('INSERT INTO agua (data, ml, criado_em) VALUES (?, ?, ?)', data, ml, agora());
+}
+
+export async function removerAgua(db: Banco, id: number): Promise<void> {
+  await db.runAsync('DELETE FROM agua WHERE id = ?', id);
+}
+
+/** Desfaz uma remoção: grava o registro de volta com o mesmo id. */
+export async function restaurarAgua(db: Banco, r: RegistroAgua): Promise<void> {
+  await db.runAsync(
+    'INSERT INTO agua (id, data, ml, criado_em) VALUES (?, ?, ?, ?)',
+    r.id, r.data, r.ml, r.criado_em,
+  );
+}
+
+// Exercícios
+
+export type RegistroExercicio = {
+  id: number;
+  data: string;
+  tipo: TipoExercicio;
+  intensidade: Intensidade | null;
+  foco: Foco | null;
+  minutos: number | null;
+  distancia_km: number | null;
+  kcal: number;
+  criado_em: string;
+};
+
+export async function listarExercicios(db: Banco, data: string): Promise<RegistroExercicio[]> {
+  return db.getAllAsync<RegistroExercicio>(
+    'SELECT id, data, tipo, intensidade, foco, minutos, distancia_km, kcal, criado_em FROM exercicios WHERE data = ? ORDER BY id',
+    data,
+  );
+}
+
+export async function registrarExercicio(
+  db: Banco,
+  data: string,
+  e: {
+    tipo: TipoExercicio;
+    intensidade: Intensidade | null;
+    foco: Foco | null;
+    minutos: number | null;
+    distanciaKm: number | null;
+    kcal: number;
+  },
+): Promise<void> {
+  await db.runAsync(
+    'INSERT INTO exercicios (data, tipo, intensidade, foco, minutos, distancia_km, kcal, criado_em) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+    data, e.tipo, e.intensidade, e.foco, e.minutos, e.distanciaKm, e.kcal, agora(),
+  );
+}
+
+export async function removerExercicio(db: Banco, id: number): Promise<void> {
+  await db.runAsync('DELETE FROM exercicios WHERE id = ?', id);
+}
+
+/** Desfaz uma remoção: grava o registro de volta com o mesmo id. */
+export async function restaurarExercicio(db: Banco, r: RegistroExercicio): Promise<void> {
+  await db.runAsync(
+    'INSERT INTO exercicios (id, data, tipo, intensidade, foco, minutos, distancia_km, kcal, criado_em) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
+    r.id, r.data, r.tipo, r.intensidade, r.foco, r.minutos, r.distancia_km, r.kcal, r.criado_em,
+  );
 }
 
 // Registros

@@ -1,11 +1,10 @@
-import { router, useFocusEffect } from 'expo-router';
-import { voltar } from '@/lib/navegacao';
+import { useFocusEffect } from 'expo-router';
 import { useBanco, useTipoArmazenamento } from '@/lib/banco';
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { ScrollView, Text, TextInput, View } from 'react-native';
-import { Botao, Cartao, Chip, useTema, type PreferenciaTema } from '@/components/ui';
+import { Cartao, Chip, useTema, type PreferenciaTema } from '@/components/ui';
 import { CartaoConta } from '@/components/conta';
-import { lerPerfil, salvarPerfil } from '@/lib/db';
+import { lerPerfil, salvarPeso, salvarPerfil } from '@/lib/db';
 import { metaCalculada, metaDiaria, type Atividade, type Objetivo, type Perfil, type Sexo } from '@/lib/nutrition';
 
 const ATIVIDADES: { id: Atividade; nome: string; dica: string }[] = [
@@ -21,6 +20,9 @@ const OBJETIVOS: { id: Objetivo; nome: string }[] = [
   { id: 'manter', nome: 'Manter peso' },
   { id: 'ganhar', nome: 'Ganhar massa' },
 ];
+
+/** Tempo de espera depois da última tecla antes de gravar o perfil. */
+const ESPERA_SALVAR_MS = 800;
 
 const TEMAS: { id: PreferenciaTema; nome: string }[] = [
   { id: 'sistema', nome: 'Automático' },
@@ -39,11 +41,15 @@ export default function TelaPerfil() {
   const [atividade, setAtividade] = useState<Atividade>('leve');
   const [objetivo, setObjetivo] = useState<Objetivo>('manter');
   const [metaManual, setMetaManual] = useState('');
+  const [salvo, setSalvo] = useState(false);
+  /** Último perfil que já está no banco, para não gravar duas vezes a mesma coisa. */
+  const gravado = useRef<string | null>(null);
 
   useFocusEffect(
     useCallback(() => {
       lerPerfil(db).then((p) => {
         if (!p) return;
+        gravado.current = JSON.stringify(p);
         setSexo(p.sexo);
         setIdade(String(p.idade));
         setAltura(String(p.alturaCm));
@@ -54,6 +60,13 @@ export default function TelaPerfil() {
       });
     }, [db]),
   );
+
+  // O aviso de salvo some sozinho, para não ficar preso na tela.
+  useEffect(() => {
+    if (!salvo) return;
+    const t = setTimeout(() => setSalvo(false), 4000);
+    return () => clearTimeout(t);
+  }, [salvo]);
 
   const numero = (t: string) => Number(t.replace(',', '.'));
   const perfil: Perfil = {
@@ -75,6 +88,29 @@ export default function TelaPerfil() {
 
   const valido = erros.length === 0;
   const meta = valido ? metaDiaria(perfil) : null;
+
+  // O peso sozinho já serve para a água e os exercícios, então é gravado mesmo
+  // sem idade e altura, que só entram no cálculo da meta de calorias.
+  const pesoValido = perfil.pesoKg >= 30 && perfil.pesoKg <= 300;
+  useEffect(() => {
+    if (!pesoValido) return;
+    const t = setTimeout(() => salvarPeso(db, perfil.pesoKg), ESPERA_SALVAR_MS);
+    return () => clearTimeout(t);
+  }, [db, pesoValido, perfil.pesoKg]);
+
+  // Salva sozinho, pouco depois de parar de digitar. Não existe botão de salvar:
+  // esquecer de tocar nele deixava o resto do app sem meta.
+  const perfilTexto = JSON.stringify(perfil);
+  useEffect(() => {
+    if (!valido || perfilTexto === gravado.current) return;
+    const t = setTimeout(async () => {
+      await salvarPerfil(db, perfil);
+      gravado.current = perfilTexto;
+      setSalvo(true);
+    }, ESPERA_SALVAR_MS);
+    return () => clearTimeout(t);
+    // `perfil` vem de `perfilTexto`; comparar o texto evita gravar a cada tecla.
+  }, [db, valido, perfilTexto]); // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
     <ScrollView style={estilos.tela} contentContainerStyle={estilos.conteudo} keyboardShouldPersistTaps="handled" contentInsetAdjustmentBehavior="automatic">
@@ -99,6 +135,10 @@ export default function TelaPerfil() {
             <Text style={[estilos.suave, { flex: 1 }]}>{a.dica}</Text>
           </View>
         ))}
+        <Text style={estilos.suave}>
+          Conte aqui só o seu dia a dia, sem os treinos. Os treinos entram na aba Exercícios e somam na meta do dia.
+          Escolher um nível alto aqui e também registrar os treinos conta o esforço duas vezes.
+        </Text>
       </Cartao>
 
       <Cartao>
@@ -154,14 +194,15 @@ export default function TelaPerfil() {
 
       <CartaoConta />
 
-      <Botao
-        titulo="Salvar"
-        desabilitado={!valido}
-        onPress={async () => {
-          await salvarPerfil(db, perfil);
-          voltar();
-        }}
-      />
+      <Text accessibilityLiveRegion="polite" style={[estilos.suave, { textAlign: 'center' }]}>
+        {salvo
+          ? 'Salvo. A meta nova já vale nas outras abas.'
+          : valido
+            ? 'O que você mudar aqui salva sozinho.'
+            : pesoValido
+              ? 'Peso salvo. Complete idade e altura para o app calcular sua meta de calorias.'
+              : 'O que você mudar aqui salva sozinho.'}
+      </Text>
     </ScrollView>
   );
 }

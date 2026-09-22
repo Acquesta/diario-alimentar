@@ -1,11 +1,12 @@
 import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
-import { useBanco } from '@/lib/banco';
+import { useAoAlterar, useBanco } from '@/lib/banco';
 import { useCallback, useEffect, useState } from 'react';
 import { Pressable, ScrollView, Text, View } from 'react-native';
 import { Barra, Botao, Cartao, formatar, useTema } from '@/components/ui';
 import { hoje, rotulo, somarDias } from '@/lib/dates';
 import {
   lerPerfil,
+  listarExercicios,
   listarRegistros,
   removerRegistro,
   repetirRefeicao,
@@ -13,6 +14,7 @@ import {
   ultimaDataDaRefeicao,
   type Registro,
 } from '@/lib/db';
+import { gastoDoDia } from '@/lib/exercicios';
 import { REFEICOES, type Refeicao } from '@/lib/foods';
 import { metaDiaria, somar, type Macros, type Perfil } from '@/lib/nutrition';
 
@@ -28,12 +30,18 @@ export default function Diario() {
   const [perfil, setPerfil] = useState<Perfil | null>(null);
   const [anteriores, setAnteriores] = useState<Partial<Record<Refeicao, string>>>({});
   const [removido, setRemovido] = useState<Registro | null>(null);
+  const [kcalExercicio, setKcalExercicio] = useState(0);
 
   const carregar = useCallback(async () => {
-    const [regs, p] = await Promise.all([listarRegistros(db, data), lerPerfil(db)]);
+    const [regs, p, treinos] = await Promise.all([
+      listarRegistros(db, data),
+      lerPerfil(db),
+      listarExercicios(db, data),
+    ]);
     const ultimas = await Promise.all(REFEICOES.map((r) => ultimaDataDaRefeicao(db, data, r.id)));
     setRegistros(regs);
     setPerfil(p);
+    setKcalExercicio(gastoDoDia(treinos));
     setAnteriores(Object.fromEntries(REFEICOES.map((r, i) => [r.id, ultimas[i] ?? undefined])));
   }, [db, data]);
 
@@ -43,6 +51,10 @@ export default function Diario() {
     }, [carregar]),
   );
 
+  // As abas ficam montadas ao mesmo tempo: recarrega quando outra aba grava algo.
+  const aoAlterar = useAoAlterar();
+  useEffect(() => aoAlterar(() => carregar()), [aoAlterar, carregar]);
+
   useEffect(() => {
     if (!removido) return;
     const t = setTimeout(() => setRemovido(null), JANELA_DESFAZER_MS);
@@ -50,7 +62,9 @@ export default function Diario() {
   }, [removido]);
 
   const total = somar(registros);
-  const meta = perfil ? metaDiaria(perfil) : null;
+  // A meta do dia é a base mais o gasto líquido dos treinos de hoje.
+  const meta = perfil ? metaDiaria(perfil, kcalExercicio) : null;
+  const metaBase = perfil ? metaDiaria(perfil).kcal : null;
 
   return (
     <View style={estilos.tela}>
@@ -59,24 +73,6 @@ export default function Diario() {
         contentContainerStyle={estilos.conteudo}
         contentInsetAdjustmentBehavior="automatic"
       >
-        <Pressable
-          onPress={() => router.push('/perfil')}
-          accessibilityRole="link"
-          accessibilityLabel="Meu perfil e meta"
-          style={[
-            estilos.cartao,
-            { backgroundColor: cores.primaria, borderColor: cores.primaria, flexDirection: 'row', alignItems: 'center', gap: 12 },
-          ]}
-        >
-          <View style={{ flex: 1, gap: 2 }}>
-            <Text style={{ color: cores.sobrePrimaria, fontSize: 18, fontWeight: '700' }}>Meu perfil e meta</Text>
-            <Text style={{ color: cores.sobrePrimaria, fontSize: 14, opacity: 0.9 }}>
-              {meta ? `Meta: ${meta.kcal} kcal por dia · toque para ajustar` : 'Defina sua meta diária de calorias'}
-            </Text>
-          </View>
-          <Text style={{ color: cores.sobrePrimaria, fontSize: 28 }}>›</Text>
-        </Pressable>
-
         <View style={estilos.linhaEntre}>
           <Seta texto="‹" rotuloAcessivel="Dia anterior" onPress={() => setData(somarDias(data, -1))} />
           <Pressable onPress={() => setData(hoje())} accessibilityRole="button" accessibilityLabel="Voltar para hoje">
@@ -85,7 +81,17 @@ export default function Diario() {
           <Seta texto="›" rotuloAcessivel="Próximo dia" onPress={() => setData(somarDias(data, 1))} />
         </View>
 
-        <Resumo total={total} meta={meta} />
+        {!perfil && (
+          <Cartao>
+            <Text style={estilos.titulo}>Defina sua meta</Text>
+            <Text style={estilos.suave}>
+              Preencha peso, altura, idade e objetivo na aba Perfil para o app calcular sua meta diária.
+            </Text>
+            <Botao titulo="Ir para o Perfil" tipo="secundario" onPress={() => router.push('/perfil')} />
+          </Cartao>
+        )}
+
+        <Resumo total={total} meta={meta} metaBase={metaBase} kcalExercicio={kcalExercicio} />
 
         {REFEICOES.map((r) => (
           <SecaoRefeicao
@@ -160,7 +166,17 @@ function Seta({ texto, rotuloAcessivel, onPress }: { texto: string; rotuloAcessi
   );
 }
 
-function Resumo({ total, meta }: { total: Macros; meta: Macros | null }) {
+function Resumo({
+  total,
+  meta,
+  metaBase,
+  kcalExercicio,
+}: {
+  total: Macros;
+  meta: Macros | null;
+  metaBase: number | null;
+  kcalExercicio: number;
+}) {
   const { cores, estilos } = useTema();
   if (!meta) {
     return (
@@ -189,6 +205,11 @@ function Resumo({ total, meta }: { total: Macros; meta: Macros | null }) {
           <Text style={estilos.suave}>{restante < 0 ? 'acima da meta' : 'restantes'}</Text>
         </View>
       </View>
+      {kcalExercicio > 0 && metaBase !== null ? (
+        <Text style={estilos.suave}>
+          Meta de hoje: base {metaBase} + exercício {kcalExercicio} = {meta.kcal} kcal
+        </Text>
+      ) : null}
       <Barra rotulo="Calorias" valor={total.kcal} meta={meta.kcal} cor={cores.primaria} unidade="kcal" />
       <Barra rotulo="Proteína" valor={total.proteina} meta={meta.proteina} cor={cores.proteina} />
       <Barra rotulo="Carboidrato" valor={total.carboidrato} meta={meta.carboidrato} cor={cores.carboidrato} />

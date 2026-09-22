@@ -1,7 +1,7 @@
 import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { voltar } from '@/lib/navegacao';
 import { useBanco } from '@/lib/banco';
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { FlatList, Pressable, Text, TextInput, View } from 'react-native';
 import { Botao, Cartao, Chip, formatar, useTema } from '@/components/ui';
 import { hoje } from '@/lib/dates';
@@ -28,7 +28,7 @@ type Sugestao = { alimento: Alimento; gramas: number };
 export default function Adicionar() {
   const { cores, estilos } = useTema();
   const db = useBanco();
-  const params = useLocalSearchParams<{ data?: string; refeicao?: string }>();
+  const params = useLocalSearchParams<{ data?: string; refeicao?: string; escolher?: string }>();
   const data = params.data ?? hoje();
   const refeicaoInicial = (REFEICOES.find((r) => r.id === params.refeicao)?.id ?? 'almoco') as Refeicao;
 
@@ -56,6 +56,16 @@ export default function Adicionar() {
       })();
     }, [db]),
   );
+
+  // Volta do leitor de código de barras já com o alimento escolhido.
+  const jaEscolheu = useRef(false);
+  useEffect(() => {
+    if (!params.escolher || jaEscolheu.current) return;
+    const alimento = [...personalizados, ...ALIMENTOS_TACO].find((a) => chave(a) === params.escolher);
+    if (!alimento) return;
+    jaEscolheu.current = true;
+    setSelecionado({ alimento, gramas: 100 });
+  }, [params.escolher, personalizados]);
 
   const todos = useMemo(() => [...personalizados, ...ALIMENTOS_TACO], [personalizados]);
   const porChave = useMemo(() => new Map(todos.map((a) => [chave(a), a])), [todos]);
@@ -144,7 +154,12 @@ export default function Adicionar() {
           consulta.trim() ? <Text style={estilos.suave}>Nada encontrado para “{consulta}”.</Text> : null
         }
         ListFooterComponent={
-          <View style={{ marginTop: 8 }}>
+          <View style={{ marginTop: 8, gap: 8 }}>
+            <Botao
+              titulo="Ler código de barras"
+              tipo="secundario"
+              onPress={() => router.push({ pathname: '/codigo-barras', params: { data, refeicao } })}
+            />
             <Botao
               titulo="Cadastrar alimento pelo rótulo"
               tipo="secundario"

@@ -50,10 +50,10 @@ function Navegacao() {
           contentStyle: { backgroundColor: cores.fundo },
         }}
       >
-        <Stack.Screen name="index" options={{ title: 'Diário Alimentar' }} />
+        <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
         <Stack.Screen name="adicionar" options={{ title: 'Adicionar alimento' }} />
-        <Stack.Screen name="perfil" options={{ title: 'Meu perfil e meta' }} />
         <Stack.Screen name="novo-alimento" options={{ title: 'Novo alimento' }} />
+        <Stack.Screen name="codigo-barras" options={{ title: 'Código de barras' }} />
         <Stack.Screen name="prato" options={{ title: 'Prato' }} />
         <Stack.Screen name="privacidade" options={{ title: 'Privacidade' }} />
         <Stack.Screen name="apagar-conta" options={{ title: 'Apagar conta e dados' }} />
