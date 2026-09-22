@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import initSqlJs from 'sql.js';
 import { BancoSqlJs } from './banco-web.ts';
-import { lerPerfil, listarAgua, migrar, VERSAO } from './db.ts';
+import { lerPerfil, lerPeso, listarAgua, migrar, salvarPerfil, salvarPeso, VERSAO } from './db.ts';
 import type { Banco } from './banco-tipos.ts';
 
 async function bancoVazio(): Promise<Banco> {
@@ -81,4 +81,31 @@ test('banco novo já nasce na versão atual', async () => {
   const versao = await db.getFirstAsync<{ user_version: number }>('PRAGMA user_version');
   assert.equal(versao?.user_version, VERSAO);
   assert.equal(await lerPerfil(db), null);
+});
+
+test('o peso é guardado sozinho, sem precisar do perfil completo', async () => {
+  const db = await bancoVazio();
+  await migrar(db);
+  assert.equal(await lerPeso(db), null);
+
+  await salvarPeso(db, 68);
+  assert.equal(await lerPeso(db), 68);
+  // Sem idade e altura ainda não há perfil, e isso não atrapalha a água nem os treinos.
+  assert.equal(await lerPerfil(db), null);
+});
+
+test('salvar o perfil também atualiza o peso solto', async () => {
+  const db = await bancoVazio();
+  await migrar(db);
+  await salvarPeso(db, 68);
+  await salvarPerfil(db, {
+    sexo: 'masculino', idade: 25, alturaCm: 180, pesoKg: 82, atividade: 'leve', objetivo: 'manter', metaManual: null,
+  });
+  assert.equal(await lerPeso(db), 82);
+});
+
+test('quem já tinha perfil antes continua com peso, mesmo sem o valor em config', async () => {
+  const db = await bancoNaVersao3();
+  await migrar(db);
+  assert.equal(await lerPeso(db), 80);
 });

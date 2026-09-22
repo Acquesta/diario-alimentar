@@ -5,7 +5,7 @@ import { Botao, Cartao, Chip, formatar, useTema } from '@/components/ui';
 import { useAoAlterar, useBanco } from '@/lib/banco';
 import { hoje, rotulo, somarDias } from '@/lib/dates';
 import {
-  lerPerfil,
+  lerPeso,
   listarExercicios,
   registrarExercicio,
   removerExercicio,
@@ -23,7 +23,6 @@ import {
   type TipoExercicio,
   type Treino,
 } from '@/lib/exercicios';
-import type { Perfil } from '@/lib/nutrition';
 
 /** Tempo para desfazer uma remoção. */
 const JANELA_DESFAZER_MS = 6000;
@@ -35,14 +34,14 @@ export default function TelaExercicios() {
   const db = useBanco();
   const [data, setData] = useState(hoje());
   const [registros, setRegistros] = useState<RegistroExercicio[]>([]);
-  const [perfil, setPerfil] = useState<Perfil | null>(null);
+  const [pesoKg, setPesoKg] = useState<number | null>(null);
   const [removido, setRemovido] = useState<RegistroExercicio | null>(null);
   const [registrando, setRegistrando] = useState(false);
 
   const carregar = useCallback(async () => {
-    const [regs, p] = await Promise.all([listarExercicios(db, data), lerPerfil(db)]);
+    const [regs, p] = await Promise.all([listarExercicios(db, data), lerPeso(db)]);
     setRegistros(regs);
-    setPerfil(p);
+    setPesoKg(p);
   }, [db, data]);
 
   useFocusEffect(
@@ -88,7 +87,7 @@ export default function TelaExercicios() {
           </Text>
         </Cartao>
 
-        {!perfil ? (
+        {!pesoKg ? (
           <Cartao>
             <Text style={estilos.titulo}>Falta seu peso</Text>
             <Text style={estilos.suave}>
@@ -98,7 +97,7 @@ export default function TelaExercicios() {
           </Cartao>
         ) : registrando ? (
           <Formulario
-            pesoKg={perfil.pesoKg}
+            pesoKg={pesoKg}
             onCancelar={() => setRegistrando(false)}
             onSalvar={async (treino, kcal) => {
               await registrarExercicio(db, data, {

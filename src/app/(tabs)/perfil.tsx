@@ -4,7 +4,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { ScrollView, Text, TextInput, View } from 'react-native';
 import { Cartao, Chip, useTema, type PreferenciaTema } from '@/components/ui';
 import { CartaoConta } from '@/components/conta';
-import { lerPerfil, salvarPerfil } from '@/lib/db';
+import { lerPerfil, salvarPeso, salvarPerfil } from '@/lib/db';
 import { metaCalculada, metaDiaria, type Atividade, type Objetivo, type Perfil, type Sexo } from '@/lib/nutrition';
 
 const ATIVIDADES: { id: Atividade; nome: string; dica: string }[] = [
@@ -88,6 +88,15 @@ export default function TelaPerfil() {
 
   const valido = erros.length === 0;
   const meta = valido ? metaDiaria(perfil) : null;
+
+  // O peso sozinho já serve para a água e os exercícios, então é gravado mesmo
+  // sem idade e altura, que só entram no cálculo da meta de calorias.
+  const pesoValido = perfil.pesoKg >= 30 && perfil.pesoKg <= 300;
+  useEffect(() => {
+    if (!pesoValido) return;
+    const t = setTimeout(() => salvarPeso(db, perfil.pesoKg), ESPERA_SALVAR_MS);
+    return () => clearTimeout(t);
+  }, [db, pesoValido, perfil.pesoKg]);
 
   // Salva sozinho, pouco depois de parar de digitar. Não existe botão de salvar:
   // esquecer de tocar nele deixava o resto do app sem meta.
@@ -190,7 +199,9 @@ export default function TelaPerfil() {
           ? 'Salvo. A meta nova já vale nas outras abas.'
           : valido
             ? 'O que você mudar aqui salva sozinho.'
-            : 'Complete os dados acima para o app calcular sua meta.'}
+            : pesoValido
+              ? 'Peso salvo. Complete idade e altura para o app calcular sua meta de calorias.'
+              : 'O que você mudar aqui salva sozinho.'}
       </Text>
     </ScrollView>
   );

@@ -6,7 +6,7 @@ import { useAoAlterar, useBanco } from '@/lib/banco';
 import { hoje, rotulo, somarDias } from '@/lib/dates';
 import {
   lerConfig,
-  lerPerfil,
+  lerPeso,
   listarAgua,
   registrarAgua,
   removerAgua,
@@ -14,7 +14,7 @@ import {
   salvarConfig,
   type RegistroAgua,
 } from '@/lib/db';
-import { metaAgua, type Perfil } from '@/lib/nutrition';
+import { metaAgua } from '@/lib/nutrition';
 
 /** Tempo para desfazer uma remoção. */
 const JANELA_DESFAZER_MS = 6000;
@@ -32,7 +32,7 @@ export default function TelaAgua() {
   const db = useBanco();
   const [data, setData] = useState(hoje());
   const [registros, setRegistros] = useState<RegistroAgua[]>([]);
-  const [perfil, setPerfil] = useState<Perfil | null>(null);
+  const [pesoKg, setPesoKg] = useState<number | null>(null);
   const [metaSalva, setMetaSalva] = useState<number | null>(null);
   const [removido, setRemovido] = useState<RegistroAgua | null>(null);
   const [livre, setLivre] = useState('');
@@ -40,9 +40,9 @@ export default function TelaAgua() {
   const [metaTexto, setMetaTexto] = useState('');
 
   const carregar = useCallback(async () => {
-    const [regs, p, m] = await Promise.all([listarAgua(db, data), lerPerfil(db), lerConfig(db, CHAVE_META)]);
+    const [regs, p, m] = await Promise.all([listarAgua(db, data), lerPeso(db), lerConfig(db, CHAVE_META)]);
     setRegistros(regs);
-    setPerfil(p);
+    setPesoKg(p);
     setMetaSalva(m ? Number(m) : null);
   }, [db, data]);
 
@@ -63,7 +63,7 @@ export default function TelaAgua() {
   }, [removido]);
 
   const total = registros.reduce((soma, r) => soma + r.ml, 0);
-  const meta = metaSalva ?? (perfil ? metaAgua(perfil) : null);
+  const meta = metaSalva ?? (pesoKg ? metaAgua({ pesoKg }) : null);
 
   const beber = async (ml: number) => {
     await registrarAgua(db, data, ml);
@@ -221,7 +221,7 @@ export default function TelaAgua() {
               <Text style={estilos.suave}>
                 {metaSalva !== null
                   ? 'Meta definida por você.'
-                  : perfil
+                  : pesoKg
                     ? `Calculada pelo seu peso: 35 ml por kg. É uma estimativa; sede, calor e exercício mudam a necessidade.`
                     : 'Sem peso no perfil, defina a meta aqui.'}
               </Text>

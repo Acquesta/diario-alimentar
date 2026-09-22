@@ -248,6 +248,28 @@ export async function salvarConfig(db: Banco, chave: string, valor: string): Pro
   );
 }
 
+// Peso
+
+/**
+ * O peso fica guardado à parte do perfil completo, em `config`.
+ * Água e exercícios só precisam dele, e não faz sentido exigir idade e altura
+ * (que só servem para calcular a meta de calorias) para eles funcionarem.
+ */
+const CHAVE_PESO = 'peso_kg';
+
+export async function salvarPeso(db: Banco, pesoKg: number): Promise<void> {
+  await salvarConfig(db, CHAVE_PESO, String(pesoKg));
+}
+
+export async function lerPeso(db: Banco): Promise<number | null> {
+  const valor = await lerConfig(db, CHAVE_PESO);
+  const n = valor ? Number(valor) : NaN;
+  if (Number.isFinite(n) && n > 0) return n;
+  // Quem já tinha perfil antes desta versão não tem o peso em `config`.
+  const linha = await db.getFirstAsync<{ peso_kg: number }>('SELECT peso_kg FROM perfil WHERE id = 1');
+  return linha?.peso_kg ?? null;
+}
+
 // Perfil
 
 type PerfilLinha = {
@@ -275,6 +297,7 @@ export async function lerPerfil(db: Banco): Promise<Perfil | null> {
 }
 
 export async function salvarPerfil(db: Banco, p: Perfil): Promise<void> {
+  await salvarPeso(db, p.pesoKg);
   await db.runAsync(
     `INSERT INTO perfil (id, sexo, idade, altura_cm, peso_kg, atividade, objetivo, meta_manual)
      VALUES (1, ?, ?, ?, ?, ?, ?, ?)
