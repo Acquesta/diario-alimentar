@@ -1,0 +1,264 @@
+import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
+import { useBanco } from '@/lib/banco';
+import { useCallback, useEffect, useState } from 'react';
+import { Pressable, ScrollView, Text, View } from 'react-native';
+import { Barra, Botao, Cartao, formatar, useTema } from '@/components/ui';
+import { hoje, rotulo, somarDias } from '@/lib/dates';
+import {
+  lerPerfil,
+  listarRegistros,
+  removerRegistro,
+  repetirRefeicao,
+  restaurarRegistro,
+  ultimaDataDaRefeicao,
+  type Registro,
+} from '@/lib/db';
+import { REFEICOES, type Refeicao } from '@/lib/foods';
+import { metaDiaria, somar, type Macros, type Perfil } from '@/lib/nutrition';
+
+/** Tempo para desfazer uma remoção. */
+const JANELA_DESFAZER_MS = 6000;
+
+export default function Diario() {
+  const { cores, estilos } = useTema();
+  const db = useBanco();
+  const params = useLocalSearchParams<{ data?: string }>();
+  const [data, setData] = useState(params.data ?? hoje());
+  const [registros, setRegistros] = useState<Registro[]>([]);
+  const [perfil, setPerfil] = useState<Perfil | null>(null);
+  const [anteriores, setAnteriores] = useState<Partial<Record<Refeicao, string>>>({});
+  const [removido, setRemovido] = useState<Registro | null>(null);
+
+  const carregar = useCallback(async () => {
+    const [regs, p] = await Promise.all([listarRegistros(db, data), lerPerfil(db)]);
+    const ultimas = await Promise.all(REFEICOES.map((r) => ultimaDataDaRefeicao(db, data, r.id)));
+    setRegistros(regs);
+    setPerfil(p);
+    setAnteriores(Object.fromEntries(REFEICOES.map((r, i) => [r.id, ultimas[i] ?? undefined])));
+  }, [db, data]);
+
+  useFocusEffect(
+    useCallback(() => {
+      carregar();
+    }, [carregar]),
+  );
+
+  useEffect(() => {
+    if (!removido) return;
+    const t = setTimeout(() => setRemovido(null), JANELA_DESFAZER_MS);
+    return () => clearTimeout(t);
+  }, [removido]);
+
+  const total = somar(registros);
+  const meta = perfil ? metaDiaria(perfil) : null;
+
+  return (
+    <View style={estilos.tela}>
+      <ScrollView
+        style={estilos.tela}
+        contentContainerStyle={estilos.conteudo}
+        contentInsetAdjustmentBehavior="automatic"
+      >
+        <Pressable
+          onPress={() => router.push('/perfil')}
+          accessibilityRole="link"
+          accessibilityLabel="Meu perfil e meta"
+          style={[
+            estilos.cartao,
+            { backgroundColor: cores.primaria, borderColor: cores.primaria, flexDirection: 'row', alignItems: 'center', gap: 12 },
+          ]}
+        >
+          <View style={{ flex: 1, gap: 2 }}>
+            <Text style={{ color: cores.sobrePrimaria, fontSize: 18, fontWeight: '700' }}>Meu perfil e meta</Text>
+            <Text style={{ color: cores.sobrePrimaria, fontSize: 14, opacity: 0.9 }}>
+              {meta ? `Meta: ${meta.kcal} kcal por dia · toque para ajustar` : 'Defina sua meta diária de calorias'}
+            </Text>
+          </View>
+          <Text style={{ color: cores.sobrePrimaria, fontSize: 28 }}>›</Text>
+        </Pressable>
+
+        <View style={estilos.linhaEntre}>
+          <Seta texto="‹" rotuloAcessivel="Dia anterior" onPress={() => setData(somarDias(data, -1))} />
+          <Pressable onPress={() => setData(hoje())} accessibilityRole="button" accessibilityLabel="Voltar para hoje">
+            <Text style={[estilos.titulo, { fontSize: 20 }]}>{rotulo(data)}</Text>
+          </Pressable>
+          <Seta texto="›" rotuloAcessivel="Próximo dia" onPress={() => setData(somarDias(data, 1))} />
+        </View>
+
+        <Resumo total={total} meta={meta} />
+
+        {REFEICOES.map((r) => (
+          <SecaoRefeicao
+            key={r.id}
+            nome={r.nome}
+            itens={registros.filter((x) => x.refeicao === r.id)}
+            anterior={anteriores[r.id]}
+            onAdicionar={() => router.push({ pathname: '/adicionar', params: { data, refeicao: r.id } })}
+            onSalvarPrato={() => router.push({ pathname: '/prato', params: { data, refeicao: r.id } })}
+            onRepetir={async (de) => {
+              await repetirRefeicao(db, de, data, r.id);
+              carregar();
+            }}
+            onRemover={async (registro) => {
+              await removerRegistro(db, registro.id);
+              setRemovido(registro);
+              carregar();
+            }}
+          />
+        ))}
+      </ScrollView>
+
+      {removido ? (
+        <View
+          accessibilityLiveRegion="polite"
+          style={[
+            estilos.cartao,
+            {
+              position: 'absolute',
+              left: 16,
+              right: 16,
+              bottom: 24,
+              flexDirection: 'row',
+              alignItems: 'center',
+              backgroundColor: cores.texto,
+              borderColor: cores.texto,
+            },
+          ]}
+        >
+          <Text style={{ flex: 1, color: cores.fundo }} numberOfLines={1}>
+            {removido.nome} removido
+          </Text>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Desfazer remoção"
+            hitSlop={8}
+            onPress={async () => {
+              await restaurarRegistro(db, removido);
+              setRemovido(null);
+              carregar();
+            }}
+          >
+            <Text style={{ color: cores.fundo, fontWeight: '700', textDecorationLine: 'underline' }}>Desfazer</Text>
+          </Pressable>
+        </View>
+      ) : null}
+    </View>
+  );
+}
+
+function Seta({ texto, rotuloAcessivel, onPress }: { texto: string; rotuloAcessivel: string; onPress: () => void }) {
+  const { cores } = useTema();
+  return (
+    <Pressable
+      onPress={onPress}
+      accessibilityRole="button"
+      accessibilityLabel={rotuloAcessivel}
+      style={{ paddingHorizontal: 16, paddingVertical: 4 }}
+    >
+      <Text style={{ fontSize: 28, color: cores.primaria }}>{texto}</Text>
+    </Pressable>
+  );
+}
+
+function Resumo({ total, meta }: { total: Macros; meta: Macros | null }) {
+  const { cores, estilos } = useTema();
+  if (!meta) {
+    return (
+      <Cartao>
+        <Text style={estilos.numero}>{total.kcal} kcal</Text>
+        <Text style={estilos.suave}>
+          Proteína {formatar(total.proteina)} g · Carboidrato {formatar(total.carboidrato)} g · Gordura{' '}
+          {formatar(total.gordura)} g
+        </Text>
+      </Cartao>
+    );
+  }
+
+  const restante = meta.kcal - total.kcal;
+  return (
+    <Cartao>
+      <View style={estilos.linhaEntre}>
+        <View>
+          <Text style={estilos.numero}>{total.kcal}</Text>
+          <Text style={estilos.suave}>de {meta.kcal} kcal</Text>
+        </View>
+        <View style={{ alignItems: 'flex-end' }}>
+          <Text style={[estilos.titulo, { color: restante < 0 ? cores.excesso : cores.primaria, fontVariant: ['tabular-nums'] }]}>
+            {Math.abs(restante)} kcal
+          </Text>
+          <Text style={estilos.suave}>{restante < 0 ? 'acima da meta' : 'restantes'}</Text>
+        </View>
+      </View>
+      <Barra rotulo="Calorias" valor={total.kcal} meta={meta.kcal} cor={cores.primaria} unidade="kcal" />
+      <Barra rotulo="Proteína" valor={total.proteina} meta={meta.proteina} cor={cores.proteina} />
+      <Barra rotulo="Carboidrato" valor={total.carboidrato} meta={meta.carboidrato} cor={cores.carboidrato} />
+      <Barra rotulo="Gordura" valor={total.gordura} meta={meta.gordura} cor={cores.gordura} />
+    </Cartao>
+  );
+}
+
+function SecaoRefeicao({
+  nome,
+  itens,
+  anterior,
+  onAdicionar,
+  onSalvarPrato,
+  onRepetir,
+  onRemover,
+}: {
+  nome: string;
+  itens: Registro[];
+  anterior?: string;
+  onAdicionar: () => void;
+  onSalvarPrato: () => void;
+  onRepetir: (de: string) => void;
+  onRemover: (registro: Registro) => void;
+}) {
+  const { cores, estilos } = useTema();
+  const kcal = somar(itens).kcal;
+  return (
+    <Cartao>
+      <View style={estilos.linhaEntre}>
+        <Text style={estilos.titulo}>{nome}</Text>
+        <Text style={[estilos.suave, { fontVariant: ['tabular-nums'] }]}>{kcal} kcal</Text>
+      </View>
+
+      {itens.map((i) => (
+        <View key={i.id} style={[estilos.linhaEntre, { alignItems: 'flex-start' }]}>
+          <View style={{ flex: 1, minWidth: 0 }}>
+            <Text style={estilos.texto}>{i.nome}</Text>
+            <Text style={estilos.suave}>
+              {formatar(i.gramas)} g · {Math.round(i.kcal)} kcal · P {formatar(i.proteina)} · C {formatar(i.carboidrato)} · G{' '}
+              {formatar(i.gordura)}
+            </Text>
+          </View>
+          <Pressable
+            onPress={() => onRemover(i)}
+            accessibilityRole="button"
+            accessibilityLabel={`Remover ${i.nome}`}
+            hitSlop={8}
+            style={{ paddingHorizontal: 6 }}
+          >
+            <Text style={{ fontSize: 20, color: cores.suave }}>×</Text>
+          </Pressable>
+        </View>
+      ))}
+
+      <View style={{ flexDirection: 'row', gap: 8, flexWrap: 'wrap' }}>
+        <View style={{ flexGrow: 1 }}>
+          <Botao titulo="+ Adicionar" tipo="secundario" onPress={onAdicionar} />
+        </View>
+        {itens.length === 0 && anterior ? (
+          <View style={{ flexGrow: 1 }}>
+            <Botao titulo={`Repetir de ${rotulo(anterior).toLowerCase()}`} tipo="secundario" onPress={() => onRepetir(anterior)} />
+          </View>
+        ) : null}
+        {itens.length > 1 ? (
+          <View style={{ flexGrow: 1 }}>
+            <Botao titulo="Salvar como prato" tipo="secundario" onPress={onSalvarPrato} />
+          </View>
+        ) : null}
+      </View>
+    </Cartao>
+  );
+}

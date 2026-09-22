@@ -1,22 +1,40 @@
 {
   "name": "diario-alimentar",
   "version": "1.0.0",
-  "main": "index.ts",
+  "main": "expo-router/entry",
   "dependencies": {
+    "@expo/metro-runtime": "~57.0.16",
     "expo": "~57.0.24",
+    "expo-constants": "~57.0.19",
+    "expo-linking": "~57.0.10",
+    "expo-router": "~57.0.22",
+    "expo-sqlite": "~57.0.3",
     "expo-status-bar": "~57.0.1",
     "react": "19.2.3",
-    "react-native": "0.86.3"
+    "react-dom": "19.2.3",
+    "react-native": "0.86.3",
+    "react-native-safe-area-context": "~5.7.0",
+    "react-native-screens": "~4.26.0",
+    "react-native-web": "^0.21.2",
+    "sql.js": "^1.14.2"
   },
   "devDependencies": {
+    "@types/node": "^24.13.6",
     "@types/react": "~19.2.2",
+    "@types/sql.js": "^1.4.11",
     "typescript": "~6.0.3"
   },
   "scripts": {
     "start": "expo start",
     "android": "expo start --android",
     "ios": "expo start --ios",
-    "web": "expo start --web"
+    "web": "expo start --web",
+    "typecheck": "tsc --noEmit",
+    "test": "node --no-warnings --experimental-strip-types --test src/lib/*.test.ts",
+    "build:web": "expo export --platform web && node scripts/pwa.mjs",
+    "serve:web": "node scripts/serve-dist.mjs",
+    "build:taco": "node scripts/build-taco.mjs",
+    "build:sqljs": "node -e \"for (const f of ['sql-wasm.js','sql-wasm.wasm']) require('fs').copyFileSync('node_modules/sql.js/dist/'+f, 'public/sqljs/'+f)\""
   },
   "private": true
 }

@@ -1,11 +1,11 @@
 {
   "expo": {
-    "name": "diario-alimentar",
+    "name": "Diário Alimentar",
     "slug": "diario-alimentar",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
-    "userInterfaceStyle": "light",
+    "userInterfaceStyle": "automatic",
     "ios": {
       "supportsTablet": true
     },
@@ -19,7 +19,29 @@
       "predictiveBackGestureEnabled": false
     },
     "web": {
-      "favicon": "./assets/favicon.png"
+      "favicon": "./assets/favicon.png",
+      "bundler": "metro",
+      "output": "single",
+      "name": "Diário Alimentar",
+      "shortName": "Diário",
+      "themeColor": "#2F7D5B",
+      "backgroundColor": "#F6F7F4"
+    },
+    "plugins": [
+      [
+        "expo-router",
+        {
+          "headers": {
+            "Cross-Origin-Embedder-Policy": "require-corp",
+            "Cross-Origin-Opener-Policy": "same-origin"
+          }
+        }
+      ],
+      "expo-sqlite"
+    ],
+    "scheme": "diarioalimentar",
+    "experiments": {
+      "typedRoutes": true
     }
   }
 }
