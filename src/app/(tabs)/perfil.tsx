@@ -1,8 +1,8 @@
 import { useFocusEffect } from 'expo-router';
 import { useBanco, useTipoArmazenamento } from '@/lib/banco';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { ScrollView, Text, TextInput, View } from 'react-native';
-import { Botao, Cartao, Chip, useTema, type PreferenciaTema } from '@/components/ui';
+import { Cartao, Chip, useTema, type PreferenciaTema } from '@/components/ui';
 import { CartaoConta } from '@/components/conta';
 import { lerPerfil, salvarPerfil } from '@/lib/db';
 import { metaCalculada, metaDiaria, type Atividade, type Objetivo, type Perfil, type Sexo } from '@/lib/nutrition';
@@ -20,6 +20,9 @@ const OBJETIVOS: { id: Objetivo; nome: string }[] = [
   { id: 'manter', nome: 'Manter peso' },
   { id: 'ganhar', nome: 'Ganhar massa' },
 ];
+
+/** Tempo de espera depois da última tecla antes de gravar o perfil. */
+const ESPERA_SALVAR_MS = 800;
 
 const TEMAS: { id: PreferenciaTema; nome: string }[] = [
   { id: 'sistema', nome: 'Automático' },
@@ -39,11 +42,14 @@ export default function TelaPerfil() {
   const [objetivo, setObjetivo] = useState<Objetivo>('manter');
   const [metaManual, setMetaManual] = useState('');
   const [salvo, setSalvo] = useState(false);
+  /** Último perfil que já está no banco, para não gravar duas vezes a mesma coisa. */
+  const gravado = useRef<string | null>(null);
 
   useFocusEffect(
     useCallback(() => {
       lerPerfil(db).then((p) => {
         if (!p) return;
+        gravado.current = JSON.stringify(p);
         setSexo(p.sexo);
         setIdade(String(p.idade));
         setAltura(String(p.alturaCm));
@@ -82,6 +88,20 @@ export default function TelaPerfil() {
 
   const valido = erros.length === 0;
   const meta = valido ? metaDiaria(perfil) : null;
+
+  // Salva sozinho, pouco depois de parar de digitar. Não existe botão de salvar:
+  // esquecer de tocar nele deixava o resto do app sem meta.
+  const perfilTexto = JSON.stringify(perfil);
+  useEffect(() => {
+    if (!valido || perfilTexto === gravado.current) return;
+    const t = setTimeout(async () => {
+      await salvarPerfil(db, perfil);
+      gravado.current = perfilTexto;
+      setSalvo(true);
+    }, ESPERA_SALVAR_MS);
+    return () => clearTimeout(t);
+    // `perfil` vem de `perfilTexto`; comparar o texto evita gravar a cada tecla.
+  }, [db, valido, perfilTexto]); // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
     <ScrollView style={estilos.tela} contentContainerStyle={estilos.conteudo} keyboardShouldPersistTaps="handled" contentInsetAdjustmentBehavior="automatic">
@@ -165,19 +185,13 @@ export default function TelaPerfil() {
 
       <CartaoConta />
 
-      <Botao
-        titulo={salvo ? 'Salvo' : 'Salvar'}
-        desabilitado={!valido}
-        onPress={async () => {
-          await salvarPerfil(db, perfil);
-          setSalvo(true);
-        }}
-      />
-      {salvo && (
-        <Text accessibilityLiveRegion="polite" style={[estilos.suave, { textAlign: 'center' }]}>
-          Perfil salvo. A meta nova já vale na aba Alimentação.
-        </Text>
-      )}
+      <Text accessibilityLiveRegion="polite" style={[estilos.suave, { textAlign: 'center' }]}>
+        {salvo
+          ? 'Salvo. A meta nova já vale nas outras abas.'
+          : valido
+            ? 'O que você mudar aqui salva sozinho.'
+            : 'Complete os dados acima para o app calcular sua meta.'}
+      </Text>
     </ScrollView>
   );
 }
