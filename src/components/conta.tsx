@@ -148,6 +148,7 @@ export function CartaoConta() {
       )}
 
       {conta.erro && <Text style={[estilos.suave, { color: cores.perigo }]}>{conta.erro}</Text>}
+      {conta.aviso && !conta.erro && <Text style={estilos.suave}>{conta.aviso}</Text>}
 
       <View style={{ flexDirection: 'row', gap: 16, flexWrap: 'wrap' }}>
         <Text style={[estilos.suave, { color: cores.primaria }]} onPress={() => router.push('/privacidade')} accessibilityRole="link">

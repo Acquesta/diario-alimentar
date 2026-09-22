@@ -27,6 +27,8 @@ type Conta = {
   ultimoBackup: string | null;
   ocupado: boolean;
   erro: string | null;
+  /** Recado curto depois de uma ação (ex.: não havia nada para enviar). */
+  aviso: string | null;
   pendencia: Pendencia | null;
   podeDesfazer: boolean;
   pedirCodigo: (email: string) => Promise<void>;
@@ -48,6 +50,7 @@ export function ContaProvider({ children }: { children: ReactNode }) {
   const [ultimoBackup, setUltimoBackup] = useState<string | null>(null);
   const [ocupado, setOcupado] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
+  const [aviso, setAviso] = useState<string | null>(null);
   const [pendencia, setPendencia] = useState<Pendencia | null>(null);
   const [podeDesfazer, setPodeDesfazer] = useState(false);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -100,6 +103,9 @@ export function ContaProvider({ children }: { children: ReactNode }) {
         const local = await exportar(db);
         const localVazio = vazio(local);
         const jaSincronizou = kv.ler(chaveSincronizado(u.id)) === '1';
+        if (localVazio && !automatico) {
+          setAviso('Ainda não há nada para enviar. Registre um alimento primeiro.');
+        }
         if (automatico && localVazio) return;
         if (jaSincronizou && !localVazio) {
           await gravarNuvem(u.id, local);
@@ -108,8 +114,10 @@ export function ContaProvider({ children }: { children: ReactNode }) {
         }
         const nuvem = await lerNuvem(u.id);
         const acao = decidir({ localVazio, nuvemVazia: vazio(nuvem?.dados), jaSincronizou });
-        if (acao === 'enviar') await gravarNuvem(u.id, local);
-        else if (acao === 'perguntar' && nuvem) {
+        if (acao === 'enviar') {
+          await gravarNuvem(u.id, local);
+          setAviso(null);
+        } else if (acao === 'perguntar' && nuvem) {
           setPendencia({ atualizadoEm: nuvem.atualizado_em, aparelho: nuvem.aparelho, aparelhoTemDados: !localVazio });
         } else kv.gravar(chaveSincronizado(u.id), '1');
         setErro(null);
@@ -166,6 +174,7 @@ export function ContaProvider({ children }: { children: ReactNode }) {
   const comOcupado = useCallback(async (fn: () => Promise<void>) => {
     setOcupado(true);
     setErro(null);
+    setAviso(null);
     try {
       await fn();
     } catch (e) {
@@ -183,6 +192,7 @@ export function ContaProvider({ children }: { children: ReactNode }) {
       ultimoBackup,
       ocupado,
       erro,
+      aviso,
       pendencia,
       podeDesfazer,
       pedirCodigo: (email) =>
@@ -249,7 +259,7 @@ export function ContaProvider({ children }: { children: ReactNode }) {
           if (apagarDoAparelho) await importar(db, { versaoEsquema: VERSAO, tabelas: {} });
         }),
     }),
-    [usuario, ultimoBackup, ocupado, erro, pendencia, podeDesfazer, comOcupado, sincronizar, lerNuvem, gravarNuvem, db],
+    [usuario, ultimoBackup, ocupado, erro, aviso, pendencia, podeDesfazer, comOcupado, sincronizar, lerNuvem, gravarNuvem, db],
   );
 
   return <ContaContexto.Provider value={conta}>{children}</ContaContexto.Provider>;
