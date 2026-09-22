@@ -1,7 +1,6 @@
-import { router, useFocusEffect } from 'expo-router';
-import { voltar } from '@/lib/navegacao';
+import { useFocusEffect } from 'expo-router';
 import { useBanco, useTipoArmazenamento } from '@/lib/banco';
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { ScrollView, Text, TextInput, View } from 'react-native';
 import { Botao, Cartao, Chip, useTema, type PreferenciaTema } from '@/components/ui';
 import { CartaoConta } from '@/components/conta';
@@ -39,6 +38,7 @@ export default function TelaPerfil() {
   const [atividade, setAtividade] = useState<Atividade>('leve');
   const [objetivo, setObjetivo] = useState<Objetivo>('manter');
   const [metaManual, setMetaManual] = useState('');
+  const [salvo, setSalvo] = useState(false);
 
   useFocusEffect(
     useCallback(() => {
@@ -54,6 +54,13 @@ export default function TelaPerfil() {
       });
     }, [db]),
   );
+
+  // O aviso de salvo some sozinho, para não ficar preso na tela.
+  useEffect(() => {
+    if (!salvo) return;
+    const t = setTimeout(() => setSalvo(false), 4000);
+    return () => clearTimeout(t);
+  }, [salvo]);
 
   const numero = (t: string) => Number(t.replace(',', '.'));
   const perfil: Perfil = {
@@ -155,13 +162,18 @@ export default function TelaPerfil() {
       <CartaoConta />
 
       <Botao
-        titulo="Salvar"
+        titulo={salvo ? 'Salvo' : 'Salvar'}
         desabilitado={!valido}
         onPress={async () => {
           await salvarPerfil(db, perfil);
-          voltar();
+          setSalvo(true);
         }}
       />
+      {salvo && (
+        <Text accessibilityLiveRegion="polite" style={[estilos.suave, { textAlign: 'center' }]}>
+          Perfil salvo. A meta nova já vale na aba Alimentação.
+        </Text>
+      )}
     </ScrollView>
   );
 }

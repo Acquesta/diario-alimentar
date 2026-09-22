@@ -59,24 +59,6 @@ export default function Diario() {
         contentContainerStyle={estilos.conteudo}
         contentInsetAdjustmentBehavior="automatic"
       >
-        <Pressable
-          onPress={() => router.push('/perfil')}
-          accessibilityRole="link"
-          accessibilityLabel="Meu perfil e meta"
-          style={[
-            estilos.cartao,
-            { backgroundColor: cores.primaria, borderColor: cores.primaria, flexDirection: 'row', alignItems: 'center', gap: 12 },
-          ]}
-        >
-          <View style={{ flex: 1, gap: 2 }}>
-            <Text style={{ color: cores.sobrePrimaria, fontSize: 18, fontWeight: '700' }}>Meu perfil e meta</Text>
-            <Text style={{ color: cores.sobrePrimaria, fontSize: 14, opacity: 0.9 }}>
-              {meta ? `Meta: ${meta.kcal} kcal por dia · toque para ajustar` : 'Defina sua meta diária de calorias'}
-            </Text>
-          </View>
-          <Text style={{ color: cores.sobrePrimaria, fontSize: 28 }}>›</Text>
-        </Pressable>
-
         <View style={estilos.linhaEntre}>
           <Seta texto="‹" rotuloAcessivel="Dia anterior" onPress={() => setData(somarDias(data, -1))} />
           <Pressable onPress={() => setData(hoje())} accessibilityRole="button" accessibilityLabel="Voltar para hoje">
@@ -84,6 +66,16 @@ export default function Diario() {
           </Pressable>
           <Seta texto="›" rotuloAcessivel="Próximo dia" onPress={() => setData(somarDias(data, 1))} />
         </View>
+
+        {!perfil && (
+          <Cartao>
+            <Text style={estilos.titulo}>Defina sua meta</Text>
+            <Text style={estilos.suave}>
+              Preencha peso, altura, idade e objetivo na aba Perfil para o app calcular sua meta diária.
+            </Text>
+            <Botao titulo="Ir para o Perfil" tipo="secundario" onPress={() => router.push('/perfil')} />
+          </Cartao>
+        )}
 
         <Resumo total={total} meta={meta} />
 
