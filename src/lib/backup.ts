@@ -15,6 +15,8 @@ export const TABELAS = [
   'config',
   'pratos',
   'prato_itens',
+  'agua',
+  'exercicios',
 ] as const;
 
 export type Tabela = (typeof TABELAS)[number];
@@ -22,7 +24,15 @@ export type Linha = Record<string, Parametro>;
 export type Instantaneo = { versaoEsquema: number; tabelas: Partial<Record<Tabela, Linha[]>> };
 
 /** Tabelas que contam como "dados do diário". `config` (tema) sozinha não conta. */
-const TABELAS_COM_DADOS: Tabela[] = ['perfil', 'alimentos_personalizados', 'registros', 'favoritos', 'pratos'];
+const TABELAS_COM_DADOS: Tabela[] = [
+  'perfil',
+  'alimentos_personalizados',
+  'registros',
+  'favoritos',
+  'pratos',
+  'agua',
+  'exercicios',
+];
 
 export async function exportar(db: Banco): Promise<Instantaneo> {
   const tabelas: Instantaneo['tabelas'] = {};

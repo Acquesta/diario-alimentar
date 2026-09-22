@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import initSqlJs from 'sql.js';
 import { BancoSqlJs } from './banco-web.ts';
 import { decidir, exportar, importar, vazio, type Instantaneo } from './backup.ts';
-import { migrar, registrar, salvarConfig, salvarPerfil, salvarPrato, VERSAO } from './db.ts';
+import { migrar, registrar, registrarAgua, registrarExercicio, salvarConfig, salvarPerfil, salvarPrato, VERSAO } from './db.ts';
 import type { Alimento } from './foods.ts';
 
 async function bancoNovo() {
@@ -20,6 +20,10 @@ async function bancoComDados() {
   await salvarPerfil(db, { sexo: 'masculino', idade: 25, alturaCm: 180, pesoKg: 80, atividade: 'leve', objetivo: 'manter', metaManual: null });
   await registrar(db, '2026-09-22', 'almoco', arroz, 150);
   await salvarPrato(db, { nome: 'PF', itens: [{ alimento: arroz, gramas: 200 }] });
+  await registrarAgua(db, '2026-09-22', 500);
+  await registrarExercicio(db, '2026-09-22', {
+    tipo: 'musculacao', intensidade: 'moderado', minutos: 60, distanciaKm: null, kcal: 200,
+  });
   await salvarConfig(db, 'tema', 'escuro');
   return db;
 }
@@ -62,6 +66,23 @@ test('importar desfaz tudo se uma linha falhar', async () => {
   // registros.nome é NOT NULL
   await assert.rejects(importar(db, { versaoEsquema: VERSAO, tabelas: { registros: [{ data: '2026-01-01', nome: null }] } }));
   assert.deepEqual(await exportar(db), antes);
+});
+
+test('água e exercícios entram no backup', async () => {
+  const inst = await exportar(await bancoComDados());
+  assert.equal(inst.tabelas.agua?.length, 1);
+  assert.equal(inst.tabelas.exercicios?.length, 1);
+  assert.equal(inst.tabelas.exercicios?.[0].kcal, 200);
+
+  const destino = await bancoNovo();
+  await importar(destino, JSON.parse(JSON.stringify(inst)));
+  assert.deepEqual(await exportar(destino), inst);
+});
+
+test('só água já conta como diário com dados', async () => {
+  const db = await bancoNovo();
+  await registrarAgua(db, '2026-09-22', 300);
+  assert.equal(vazio(await exportar(db)), false);
 });
 
 test('vazio considera só dados do diário, não o tema', async () => {

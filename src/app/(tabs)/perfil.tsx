@@ -106,6 +106,10 @@ export default function TelaPerfil() {
             <Text style={[estilos.suave, { flex: 1 }]}>{a.dica}</Text>
           </View>
         ))}
+        <Text style={estilos.suave}>
+          Conte aqui só o seu dia a dia, sem os treinos. Os treinos entram na aba Exercícios e somam na meta do dia.
+          Escolher um nível alto aqui e também registrar os treinos conta o esforço duas vezes.
+        </Text>
       </Cartao>
 
       <Cartao>

@@ -10,7 +10,7 @@ import { criarPersonalizado } from '@/lib/db';
 export default function NovoAlimento() {
   const { cores, estilos } = useTema();
   const db = useBanco();
-  const params = useLocalSearchParams<{ nome?: string }>();
+  const params = useLocalSearchParams<{ nome?: string; codigo?: string }>();
   const [nome, setNome] = useState(params.nome ?? '');
   const [porcaoG, setPorcaoG] = useState('100');
   const [kcal, setKcal] = useState('');
@@ -33,6 +33,7 @@ export default function NovoAlimento() {
         <Text style={estilos.suave}>
           Copie os valores da tabela nutricional da embalagem. Se ela mostra "porção de 200 ml", digite 200 na porção.
         </Text>
+        {params.codigo ? <Text style={estilos.suave}>Código de barras {params.codigo}</Text> : null}
         <Rotulo texto="Nome" />
         <TextInput
           style={estilos.input}
@@ -61,6 +62,7 @@ export default function NovoAlimento() {
           const f = 100 / porcao;
           const um = (v: number) => Math.round(v * f * 10) / 10;
           await criarPersonalizado(db, {
+            codigoBarras: params.codigo ?? null,
             nome: nome.trim(),
             kcal: Math.round(n(kcal) * f),
             proteina: um(n(proteina)),

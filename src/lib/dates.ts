@@ -4,6 +4,13 @@ export function hoje(): string {
   return formatar(new Date());
 }
 
+/** Data e hora local no formato "YYYY-MM-DD HH:MM:SS", como o SQLite grava. */
+export function agora(): string {
+  const d = new Date();
+  const p2 = (n: number) => String(n).padStart(2, '0');
+  return `${formatar(d)} ${p2(d.getHours())}:${p2(d.getMinutes())}:${p2(d.getSeconds())}`;
+}
+
 export function somarDias(data: string, dias: number): string {
   const [a, m, d] = data.split('-').map(Number);
   return formatar(new Date(a, m - 1, d + dias));

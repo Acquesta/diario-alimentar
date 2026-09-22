@@ -1,11 +1,12 @@
 import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
-import { useBanco } from '@/lib/banco';
+import { useAoAlterar, useBanco } from '@/lib/banco';
 import { useCallback, useEffect, useState } from 'react';
 import { Pressable, ScrollView, Text, View } from 'react-native';
 import { Barra, Botao, Cartao, formatar, useTema } from '@/components/ui';
 import { hoje, rotulo, somarDias } from '@/lib/dates';
 import {
   lerPerfil,
+  listarExercicios,
   listarRegistros,
   removerRegistro,
   repetirRefeicao,
@@ -13,6 +14,7 @@ import {
   ultimaDataDaRefeicao,
   type Registro,
 } from '@/lib/db';
+import { gastoDoDia } from '@/lib/exercicios';
 import { REFEICOES, type Refeicao } from '@/lib/foods';
 import { metaDiaria, somar, type Macros, type Perfil } from '@/lib/nutrition';
 
@@ -28,12 +30,18 @@ export default function Diario() {
   const [perfil, setPerfil] = useState<Perfil | null>(null);
   const [anteriores, setAnteriores] = useState<Partial<Record<Refeicao, string>>>({});
   const [removido, setRemovido] = useState<Registro | null>(null);
+  const [kcalExercicio, setKcalExercicio] = useState(0);
 
   const carregar = useCallback(async () => {
-    const [regs, p] = await Promise.all([listarRegistros(db, data), lerPerfil(db)]);
+    const [regs, p, treinos] = await Promise.all([
+      listarRegistros(db, data),
+      lerPerfil(db),
+      listarExercicios(db, data),
+    ]);
     const ultimas = await Promise.all(REFEICOES.map((r) => ultimaDataDaRefeicao(db, data, r.id)));
     setRegistros(regs);
     setPerfil(p);
+    setKcalExercicio(gastoDoDia(treinos));
     setAnteriores(Object.fromEntries(REFEICOES.map((r, i) => [r.id, ultimas[i] ?? undefined])));
   }, [db, data]);
 
@@ -43,6 +51,10 @@ export default function Diario() {
     }, [carregar]),
   );
 
+  // As abas ficam montadas ao mesmo tempo: recarrega quando outra aba grava algo.
+  const aoAlterar = useAoAlterar();
+  useEffect(() => aoAlterar(() => carregar()), [aoAlterar, carregar]);
+
   useEffect(() => {
     if (!removido) return;
     const t = setTimeout(() => setRemovido(null), JANELA_DESFAZER_MS);
@@ -50,7 +62,9 @@ export default function Diario() {
   }, [removido]);
 
   const total = somar(registros);
-  const meta = perfil ? metaDiaria(perfil) : null;
+  // A meta do dia é a base mais o gasto líquido dos treinos de hoje.
+  const meta = perfil ? metaDiaria(perfil, kcalExercicio) : null;
+  const metaBase = perfil ? metaDiaria(perfil).kcal : null;
 
   return (
     <View style={estilos.tela}>
@@ -77,7 +91,7 @@ export default function Diario() {
           </Cartao>
         )}
 
-        <Resumo total={total} meta={meta} />
+        <Resumo total={total} meta={meta} metaBase={metaBase} kcalExercicio={kcalExercicio} />
 
         {REFEICOES.map((r) => (
           <SecaoRefeicao
@@ -152,7 +166,17 @@ function Seta({ texto, rotuloAcessivel, onPress }: { texto: string; rotuloAcessi
   );
 }
 
-function Resumo({ total, meta }: { total: Macros; meta: Macros | null }) {
+function Resumo({
+  total,
+  meta,
+  metaBase,
+  kcalExercicio,
+}: {
+  total: Macros;
+  meta: Macros | null;
+  metaBase: number | null;
+  kcalExercicio: number;
+}) {
   const { cores, estilos } = useTema();
   if (!meta) {
     return (
@@ -181,6 +205,11 @@ function Resumo({ total, meta }: { total: Macros; meta: Macros | null }) {
           <Text style={estilos.suave}>{restante < 0 ? 'acima da meta' : 'restantes'}</Text>
         </View>
       </View>
+      {kcalExercicio > 0 && metaBase !== null ? (
+        <Text style={estilos.suave}>
+          Meta de hoje: base {metaBase} + exercício {kcalExercicio} = {meta.kcal} kcal
+        </Text>
+      ) : null}
       <Barra rotulo="Calorias" valor={total.kcal} meta={meta.kcal} cor={cores.primaria} unidade="kcal" />
       <Barra rotulo="Proteína" valor={total.proteina} meta={meta.proteina} cor={cores.proteina} />
       <Barra rotulo="Carboidrato" valor={total.carboidrato} meta={meta.carboidrato} cor={cores.carboidrato} />

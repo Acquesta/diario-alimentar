@@ -66,12 +66,21 @@ export function metaCalculada(p: Perfil): number {
   return arredondar(Math.max(meta, META_MINIMA[p.sexo]), 10);
 }
 
-export function metaDiaria(p: Perfil): Macros {
-  const kcal = p.metaManual ?? metaCalculada(p);
+/**
+ * Meta do dia. `kcalExercicio` é o gasto líquido dos treinos do dia, que entra
+ * como calorias a mais para comer: meta de hoje = base + exercício.
+ */
+export function metaDiaria(p: Perfil, kcalExercicio = 0): Macros {
+  const kcal = (p.metaManual ?? metaCalculada(p)) + Math.max(0, Math.round(kcalExercicio));
   const proteina = Math.round(p.pesoKg * PROTEINA_POR_KG[p.objetivo]);
   const gordura = Math.round((kcal * FRACAO_GORDURA) / 9);
   const carboidrato = Math.max(0, Math.round((kcal - proteina * 4 - gordura * 9) / 4));
   return { kcal, proteina, carboidrato, gordura };
+}
+
+/** Meta de água do dia em ml: 35 ml por kg, arredondada para 100 ml. */
+export function metaAgua(p: Pick<Perfil, 'pesoKg'>): number {
+  return arredondar(35 * p.pesoKg, 100);
 }
 
 /** Valores de uma porção a partir dos valores por 100 g. */
