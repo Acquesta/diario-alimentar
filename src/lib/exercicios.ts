@@ -8,6 +8,8 @@
 
 export type TipoExercicio = 'musculacao' | 'corrida' | 'caminhada' | 'bike' | 'outro';
 export type Intensidade = 'moderado' | 'intenso';
+/** Só para musculação: o que o treino puxou mais. */
+export type Foco = 'composto' | 'isolado';
 /** O que o app pede na tela para cada tipo. */
 export type Medida = 'tempo' | 'distancia' | 'kcal';
 
@@ -24,15 +26,30 @@ export const INTENSIDADES: { id: Intensidade; nome: string }[] = [
   { id: 'intenso', nome: 'Intenso' },
 ];
 
+export const FOCOS: { id: Foco; nome: string; dica: string }[] = [
+  { id: 'composto', nome: 'Pernas ou corpo todo', dica: 'agachamento, terra, leg press, treino completo' },
+  { id: 'isolado', nome: 'Superiores ou isolados', dica: 'braço, ombro, supino, máquinas de um músculo só' },
+];
+
 /**
  * METs do Compêndio de Atividades Físicas, por tipo e intensidade.
  * Moderado e intenso mudam junto com o ritmo: caminhar a 5,5 km/h é 4,3,
  * caminhar rápido ou em subida é 5,3; pedalar a 19 km/h é 6,8 e a 25 km/h é 10.
  */
-const METS: Record<'musculacao' | 'caminhada' | 'bike', Record<Intensidade, number>> = {
-  musculacao: { moderado: 3.5, intenso: 6.0 },
+const METS: Record<'caminhada' | 'bike', Record<Intensidade, number>> = {
   caminhada: { moderado: 4.3, intenso: 5.3 },
   bike: { moderado: 6.8, intenso: 10.0 },
+};
+
+/**
+ * Musculação depende do quanto de músculo o treino move. Medindo exercício a
+ * exercício, agachamento gasta perto do dobro de um supino, e rosca direta fica
+ * no fim da fila. O compêndio não separa por exercício, então o app pergunta o
+ * foco da sessão: composto (5,0 e 6,5) ou isolado (3,5 e 5,0).
+ */
+const METS_MUSCULACAO: Record<Foco, Record<Intensidade, number>> = {
+  composto: { moderado: 5.0, intenso: 6.5 },
+  isolado: { moderado: 3.5, intenso: 5.0 },
 };
 
 /** Corrida: cerca de 1 kcal por kg a cada km, já perto do valor líquido. */
@@ -41,6 +58,8 @@ const KCAL_POR_KG_POR_KM = 1;
 export type Treino = {
   tipo: TipoExercicio;
   intensidade: Intensidade | null;
+  /** Só para musculação. */
+  foco?: Foco | null;
   minutos: number | null;
   distanciaKm: number | null;
   /** Só para o tipo "outro": o valor que a pessoa digitou. */
@@ -67,7 +86,11 @@ export function gastoTreino(t: Treino, pesoKg: number): number {
 
   const minutos = t.minutos ?? 0;
   if (!(minutos > 0)) return 0;
-  const met = METS[t.tipo][t.intensidade ?? 'moderado'];
+  const intensidade = t.intensidade ?? 'moderado';
+  const met =
+    t.tipo === 'musculacao'
+      ? METS_MUSCULACAO[t.foco ?? 'composto'][intensidade]
+      : METS[t.tipo][intensidade];
   return Math.round((met - 1) * pesoKg * (minutos / 60));
 }
 
@@ -83,6 +106,9 @@ export function descrever(t: Treino): string {
   else if (t.minutos) partes.push(`${t.minutos} min`);
   if (t.intensidade && t.tipo !== 'corrida' && t.tipo !== 'outro') {
     partes.push(INTENSIDADES.find((i) => i.id === t.intensidade)!.nome.toLowerCase());
+  }
+  if (t.tipo === 'musculacao' && t.foco) {
+    partes.push(FOCOS.find((f) => f.id === t.foco)!.nome.toLowerCase());
   }
   return partes.join(' · ');
 }

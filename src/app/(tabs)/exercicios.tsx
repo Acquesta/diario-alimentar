@@ -14,11 +14,13 @@ import {
 } from '@/lib/db';
 import {
   descrever,
+  FOCOS,
   gastoDoDia,
   gastoTreino,
   INTENSIDADES,
   medidaDoTipo,
   TIPOS,
+  type Foco,
   type Intensidade,
   type TipoExercicio,
   type Treino,
@@ -103,6 +105,7 @@ export default function TelaExercicios() {
               await registrarExercicio(db, data, {
                 tipo: treino.tipo,
                 intensidade: treino.intensidade,
+                foco: treino.foco ?? null,
                 minutos: treino.minutos,
                 distanciaKm: treino.distanciaKm,
                 kcal,
@@ -125,6 +128,7 @@ export default function TelaExercicios() {
                     {descrever({
                       tipo: r.tipo,
                       intensidade: r.intensidade,
+                      foco: r.foco,
                       minutos: r.minutos,
                       distanciaKm: r.distancia_km,
                       kcal: r.kcal,
@@ -201,6 +205,7 @@ function Formulario({
   const { cores, estilos } = useTema();
   const [tipo, setTipo] = useState<TipoExercicio>('musculacao');
   const [intensidade, setIntensidade] = useState<Intensidade>('moderado');
+  const [foco, setFoco] = useState<Foco>('composto');
   const [minutos, setMinutos] = useState('45');
   const [distancia, setDistancia] = useState('5');
   const [kcalTexto, setKcalTexto] = useState('');
@@ -210,6 +215,7 @@ function Formulario({
   const treino: Treino = {
     tipo,
     intensidade: medida === 'tempo' ? intensidade : null,
+    foco: tipo === 'musculacao' ? foco : null,
     minutos: medida === 'tempo' ? n(minutos) : null,
     distanciaKm: medida === 'distancia' ? n(distancia) : null,
     kcal: medida === 'kcal' ? n(kcalTexto) : null,
@@ -225,6 +231,18 @@ function Formulario({
           <Chip key={t.id} texto={t.nome} ativo={tipo === t.id} onPress={() => setTipo(t.id)} />
         ))}
       </View>
+
+      {tipo === 'musculacao' ? (
+        <>
+          <Text style={estilos.suave}>O que o treino puxou mais</Text>
+          {FOCOS.map((f) => (
+            <View key={f.id} style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+              <Chip texto={f.nome} ativo={foco === f.id} onPress={() => setFoco(f.id)} />
+              <Text style={[estilos.suave, { flex: 1 }]}>{f.dica}</Text>
+            </View>
+          ))}
+        </>
+      ) : null}
 
       {medida === 'tempo' ? (
         <>

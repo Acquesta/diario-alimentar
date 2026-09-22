@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import initSqlJs from 'sql.js';
 import { BancoSqlJs } from './banco-web.ts';
-import { lerPerfil, lerPeso, listarAgua, migrar, salvarPerfil, salvarPeso, VERSAO } from './db.ts';
+import { lerPerfil, lerPeso, listarAgua, listarExercicios, migrar, salvarPerfil, salvarPeso, VERSAO } from './db.ts';
 import type { Banco } from './banco-tipos.ts';
 
 async function bancoVazio(): Promise<Banco> {
@@ -108,4 +108,19 @@ test('quem já tinha perfil antes continua com peso, mesmo sem o valor em config
   const db = await bancoNaVersao3();
   await migrar(db);
   assert.equal(await lerPeso(db), 80);
+});
+
+test('migrar para a versão 5 acrescenta o foco sem mexer nos treinos já gravados', async () => {
+  const db = await bancoNaVersao3();
+  await migrar(db);
+  await db.runAsync(
+    'INSERT INTO exercicios (data, tipo, intensidade, minutos, distancia_km, kcal, criado_em) VALUES (?, ?, ?, ?, ?, ?, ?)',
+    '2026-09-22', 'musculacao', 'moderado', 60, null, 200, '2026-09-22 10:00:00',
+  );
+  await migrar(db);
+
+  const treinos = await listarExercicios(db, '2026-09-22');
+  assert.equal(treinos.length, 1);
+  assert.equal(treinos[0].kcal, 200);
+  assert.equal(treinos[0].foco, null);
 });

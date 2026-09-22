@@ -22,7 +22,7 @@ async function bancoComDados() {
   await salvarPrato(db, { nome: 'PF', itens: [{ alimento: arroz, gramas: 200 }] });
   await registrarAgua(db, '2026-09-22', 500);
   await registrarExercicio(db, '2026-09-22', {
-    tipo: 'musculacao', intensidade: 'moderado', minutos: 60, distanciaKm: null, kcal: 200,
+    tipo: 'musculacao', intensidade: 'moderado', foco: 'composto', minutos: 60, distanciaKm: null, kcal: 200,
   });
   await salvarConfig(db, 'tema', 'escuro');
   return db;

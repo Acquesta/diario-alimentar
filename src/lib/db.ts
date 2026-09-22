@@ -1,13 +1,13 @@
 import type { Banco } from './banco-tipos';
 import type { Alimento, Origem, Refeicao } from './foods';
 import { porcao, type Macros, type Perfil } from './nutrition.ts';
-import type { Intensidade, TipoExercicio } from './exercicios.ts';
+import type { Foco, Intensidade, TipoExercicio } from './exercicios.ts';
 import { agora } from './dates.ts';
 
 /** Todo acesso ao banco passa por aqui, para facilitar trocar o armazenamento se precisar. */
 
 export const NOME_BANCO = 'diario.db';
-export const VERSAO = 4;
+export const VERSAO = 5;
 
 export async function migrar(db: Banco): Promise<void> {
   const linha = await db.getFirstAsync<{ user_version: number }>('PRAGMA user_version');
@@ -118,6 +118,14 @@ export async function migrar(db: Banco): Promise<void> {
     const colunas = await db.getAllAsync<{ name: string }>('PRAGMA table_info(alimentos_personalizados)');
     if (!colunas.some((c) => c.name === 'codigo_barras')) {
       await db.execAsync('ALTER TABLE alimentos_personalizados ADD COLUMN codigo_barras TEXT');
+    }
+  }
+
+  if (atual < 5) {
+    // Foco do treino de musculação (composto ou isolado), que muda o gasto.
+    const colunas = await db.getAllAsync<{ name: string }>('PRAGMA table_info(exercicios)');
+    if (!colunas.some((c) => c.name === 'foco')) {
+      await db.execAsync('ALTER TABLE exercicios ADD COLUMN foco TEXT');
     }
   }
 
@@ -373,6 +381,7 @@ export type RegistroExercicio = {
   data: string;
   tipo: TipoExercicio;
   intensidade: Intensidade | null;
+  foco: Foco | null;
   minutos: number | null;
   distancia_km: number | null;
   kcal: number;
@@ -381,7 +390,7 @@ export type RegistroExercicio = {
 
 export async function listarExercicios(db: Banco, data: string): Promise<RegistroExercicio[]> {
   return db.getAllAsync<RegistroExercicio>(
-    'SELECT id, data, tipo, intensidade, minutos, distancia_km, kcal, criado_em FROM exercicios WHERE data = ? ORDER BY id',
+    'SELECT id, data, tipo, intensidade, foco, minutos, distancia_km, kcal, criado_em FROM exercicios WHERE data = ? ORDER BY id',
     data,
   );
 }
@@ -389,11 +398,18 @@ export async function listarExercicios(db: Banco, data: string): Promise<Registr
 export async function registrarExercicio(
   db: Banco,
   data: string,
-  e: { tipo: TipoExercicio; intensidade: Intensidade | null; minutos: number | null; distanciaKm: number | null; kcal: number },
+  e: {
+    tipo: TipoExercicio;
+    intensidade: Intensidade | null;
+    foco: Foco | null;
+    minutos: number | null;
+    distanciaKm: number | null;
+    kcal: number;
+  },
 ): Promise<void> {
   await db.runAsync(
-    'INSERT INTO exercicios (data, tipo, intensidade, minutos, distancia_km, kcal, criado_em) VALUES (?, ?, ?, ?, ?, ?, ?)',
-    data, e.tipo, e.intensidade, e.minutos, e.distanciaKm, e.kcal, agora(),
+    'INSERT INTO exercicios (data, tipo, intensidade, foco, minutos, distancia_km, kcal, criado_em) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+    data, e.tipo, e.intensidade, e.foco, e.minutos, e.distanciaKm, e.kcal, agora(),
   );
 }
 
@@ -404,8 +420,8 @@ export async function removerExercicio(db: Banco, id: number): Promise<void> {
 /** Desfaz uma remoção: grava o registro de volta com o mesmo id. */
 export async function restaurarExercicio(db: Banco, r: RegistroExercicio): Promise<void> {
   await db.runAsync(
-    'INSERT INTO exercicios (id, data, tipo, intensidade, minutos, distancia_km, kcal, criado_em) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
-    r.id, r.data, r.tipo, r.intensidade, r.minutos, r.distancia_km, r.kcal, r.criado_em,
+    'INSERT INTO exercicios (id, data, tipo, intensidade, foco, minutos, distancia_km, kcal, criado_em) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
+    r.id, r.data, r.tipo, r.intensidade, r.foco, r.minutos, r.distancia_km, r.kcal, r.criado_em,
   );
 }
 

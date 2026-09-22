@@ -3,13 +3,29 @@ import assert from 'node:assert/strict';
 import { descrever, gastoDoDia, gastoTreino, type Treino } from './exercicios.ts';
 import { metaAgua, metaDiaria, type Perfil } from './nutrition.ts';
 
-const base: Treino = { tipo: 'musculacao', intensidade: 'moderado', minutos: 60, distanciaKm: null, kcal: null };
+const base: Treino = {
+  tipo: 'musculacao', intensidade: 'moderado', foco: 'composto', minutos: 60, distanciaKm: null, kcal: null,
+};
 
-test('musculação usa o MET líquido', () => {
-  // (3,5 − 1) × 80 kg × 1 h = 200
-  assert.equal(gastoTreino(base, 80), 200);
-  // (6,0 − 1) × 80 × 0,75 h = 300
-  assert.equal(gastoTreino({ ...base, intensidade: 'intenso', minutos: 45 }, 80), 300);
+test('musculação usa o MET líquido, conforme o foco do treino', () => {
+  // Composto: (5,0 − 1) × 80 kg × 1 h = 320
+  assert.equal(gastoTreino(base, 80), 320);
+  // Composto intenso: (6,5 − 1) × 80 × 0,75 h = 330
+  assert.equal(gastoTreino({ ...base, intensidade: 'intenso', minutos: 45 }, 80), 330);
+  // Isolado: (3,5 − 1) × 80 × 1 h = 200
+  assert.equal(gastoTreino({ ...base, foco: 'isolado' }, 80), 200);
+  // Isolado intenso: (5,0 − 1) × 80 × 1 h = 320
+  assert.equal(gastoTreino({ ...base, foco: 'isolado', intensidade: 'intenso' }, 80), 320);
+});
+
+test('treino de pernas gasta mais que treino de braço no mesmo tempo', () => {
+  const composto = gastoTreino(base, 80);
+  const isolado = gastoTreino({ ...base, foco: 'isolado' }, 80);
+  assert.ok(composto > isolado, `composto ${composto} devia passar isolado ${isolado}`);
+});
+
+test('sem foco escolhido, musculação vale como composto', () => {
+  assert.equal(gastoTreino({ ...base, foco: null }, 80), gastoTreino(base, 80));
 });
 
 test('caminhada e bike usam os próprios METs', () => {
@@ -20,7 +36,7 @@ test('caminhada e bike usam os próprios METs', () => {
 });
 
 test('cada tipo gasta diferente no mesmo tempo e intensidade', () => {
-  const trinta = (tipo: Treino['tipo']) => gastoTreino({ ...base, tipo, minutos: 30 }, 80);
+  const trinta = (tipo: Treino['tipo']) => gastoTreino({ ...base, tipo, foco: 'isolado', minutos: 30 }, 80);
   const musculacao = trinta('musculacao');
   const caminhada = trinta('caminhada');
   const bike = trinta('bike');
@@ -52,7 +68,7 @@ test('gasto do dia soma os treinos', () => {
 });
 
 test('descrição do treino', () => {
-  assert.equal(descrever(base), 'Musculação · 60 min · moderado');
+  assert.equal(descrever(base), 'Musculação · 60 min · moderado · pernas ou corpo todo');
   assert.equal(
     descrever({ tipo: 'corrida', intensidade: null, minutos: null, distanciaKm: 5.5, kcal: null }),
     'Corrida · 5,5 km',
