@@ -24,10 +24,14 @@ export const INTENSIDADES: { id: Intensidade; nome: string }[] = [
   { id: 'intenso', nome: 'Intenso' },
 ];
 
-/** METs do Compêndio de Atividades Físicas, por tipo e intensidade. */
+/**
+ * METs do Compêndio de Atividades Físicas, por tipo e intensidade.
+ * Moderado e intenso mudam junto com o ritmo: caminhar a 5,5 km/h é 4,3,
+ * caminhar rápido ou em subida é 5,3; pedalar a 19 km/h é 6,8 e a 25 km/h é 10.
+ */
 const METS: Record<'musculacao' | 'caminhada' | 'bike', Record<Intensidade, number>> = {
   musculacao: { moderado: 3.5, intenso: 6.0 },
-  caminhada: { moderado: 3.5, intenso: 5.0 },
+  caminhada: { moderado: 4.3, intenso: 5.3 },
   bike: { moderado: 6.8, intenso: 10.0 },
 };
 

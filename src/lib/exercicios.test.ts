@@ -13,10 +13,19 @@ test('musculação usa o MET líquido', () => {
 });
 
 test('caminhada e bike usam os próprios METs', () => {
-  // (3,5 − 1) × 70 × 0,5 h = 87,5 -> 88
-  assert.equal(gastoTreino({ ...base, tipo: 'caminhada', minutos: 30 }, 70), 88);
+  // (4,3 − 1) × 70 × 0,5 h = 115,5 -> 116
+  assert.equal(gastoTreino({ ...base, tipo: 'caminhada', minutos: 30 }, 70), 116);
   // (6,8 − 1) × 70 × 1 h = 406
   assert.equal(gastoTreino({ ...base, tipo: 'bike', minutos: 60 }, 70), 406);
+});
+
+test('cada tipo gasta diferente no mesmo tempo e intensidade', () => {
+  const trinta = (tipo: Treino['tipo']) => gastoTreino({ ...base, tipo, minutos: 30 }, 80);
+  const musculacao = trinta('musculacao');
+  const caminhada = trinta('caminhada');
+  const bike = trinta('bike');
+  assert.ok(musculacao < caminhada, `musculação ${musculacao} devia gastar menos que caminhada ${caminhada}`);
+  assert.ok(caminhada < bike, `caminhada ${caminhada} devia gastar menos que bike ${bike}`);
 });
 
 test('corrida é 1 kcal por kg por km', () => {
