@@ -1,5 +1,6 @@
 import { useBanco } from '@/lib/banco';
 import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
+import { BlurView } from 'expo-blur';
 import { Pressable, StyleSheet, Text, useColorScheme, View, type StyleProp, type ViewStyle } from 'react-native';
 import { lerConfig, salvarConfig } from '@/lib/db';
 
@@ -102,7 +103,7 @@ export function Botao({
 }: {
   titulo: string;
   onPress: () => void;
-  tipo?: 'primario' | 'secundario';
+  tipo?: 'primario' | 'secundario' | 'contorno';
   desabilitado?: boolean;
 }) {
   const { cores, estilos } = useTema();
@@ -115,12 +116,35 @@ export function Botao({
       disabled={desabilitado}
       style={({ pressed }) => [
         estilos.botao,
-        primario ? estilos.botaoPrimario : estilos.botaoSecundario,
+        primario ? estilos.botaoPrimario : tipo === 'contorno' ? estilos.botaoContorno : estilos.botaoSecundario,
         (pressed || desabilitado) && { opacity: desabilitado ? 0.4 : 0.8 },
       ]}
     >
       <Text style={[estilos.botaoTexto, { color: primario ? cores.sobrePrimaria : cores.primaria }]}>{titulo}</Text>
     </Pressable>
+  );
+}
+
+/**
+ * Barra flutuante de desfazer, usada depois de remover algo.
+ * Translúcida, para não tapar o que está embaixo enquanto some sozinha.
+ */
+export function AvisoDesfazer({ texto, onDesfazer }: { texto: string; onDesfazer: () => void }) {
+  const { cores, escuro, estilos } = useTema();
+  return (
+    <BlurView
+      intensity={40}
+      tint={escuro ? 'light' : 'dark'}
+      accessibilityLiveRegion="polite"
+      style={[estilos.aviso, { backgroundColor: cores.texto + 'E0' }]}
+    >
+      <Text style={{ flex: 1, color: cores.fundo, fontSize: 15 }} numberOfLines={1}>
+        {texto}
+      </Text>
+      <Pressable accessibilityRole="button" accessibilityLabel="Desfazer remoção" hitSlop={8} onPress={onDesfazer}>
+        <Text style={{ color: cores.fundo, fontWeight: '700', textDecorationLine: 'underline' }}>Desfazer</Text>
+      </Pressable>
+    </BlurView>
   );
 }
 
@@ -182,25 +206,30 @@ export function formatar(n: number): string {
 function criarEstilos(cores: Cores) {
   return StyleSheet.create({
     tela: { flex: 1, backgroundColor: cores.fundo },
-    conteudo: { padding: 16, gap: 12, paddingBottom: 48, maxWidth: 560, width: '100%', alignSelf: 'center' },
+    // O fim da lista respira acima da barra de abas, que é translúcida e flutua por cima.
+    conteudo: { padding: 16, gap: 12, paddingBottom: 110, maxWidth: 560, width: '100%', alignSelf: 'center' },
     cartao: {
       backgroundColor: cores.cartao,
       borderRadius: 14,
       borderCurve: 'continuous',
       padding: 16,
-      gap: 10,
+      gap: 12,
       borderWidth: StyleSheet.hairlineWidth,
       borderColor: cores.borda,
     },
     titulo: { fontSize: 17, fontWeight: '600', color: cores.texto },
     /** Números grandes (kcal) com largura fixa, para não "pular" quando mudam. */
-    numero: { fontSize: 32, fontWeight: '600', color: cores.texto, fontVariant: ['tabular-nums'] },
+    numero: { fontSize: 44, lineHeight: 48, fontWeight: '700', letterSpacing: -0.5, color: cores.texto, fontVariant: ['tabular-nums'] },
+    /** Número de apoio, menor que o principal mas maior que o texto. */
+    numeroMedio: { fontSize: 22, fontWeight: '700', color: cores.texto, fontVariant: ['tabular-nums'] },
     texto: { fontSize: 15, color: cores.texto },
     suave: { fontSize: 13, color: cores.suave },
     linhaEntre: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: 8 },
     botao: { paddingVertical: 12, paddingHorizontal: 16, borderRadius: 10, borderCurve: 'continuous', alignItems: 'center' },
     botaoPrimario: { backgroundColor: cores.primaria },
     botaoSecundario: { backgroundColor: cores.primariaSuave },
+    /** Ação repetida dentro de um cartão: contorno, para não competir com os dados. */
+    botaoContorno: { backgroundColor: 'transparent', borderWidth: 1, borderColor: cores.borda },
     botaoTexto: { fontSize: 15, fontWeight: '600' },
     chip: {
       paddingVertical: 8,
@@ -222,6 +251,20 @@ function criarEstilos(cores: Cores) {
       paddingVertical: 10,
       fontSize: 16,
       color: cores.texto,
+    },
+    aviso: {
+      position: 'absolute',
+      left: 16,
+      right: 16,
+      bottom: 96,
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 12,
+      paddingVertical: 14,
+      paddingHorizontal: 16,
+      borderRadius: 12,
+      borderCurve: 'continuous',
+      overflow: 'hidden',
     },
     rotuloBarra: { fontSize: 13, color: cores.suave },
     valorBarra: { fontSize: 13, color: cores.texto, fontVariant: ['tabular-nums'] },

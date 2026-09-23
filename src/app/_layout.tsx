@@ -1,6 +1,7 @@
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { ActivityIndicator, Platform, View } from 'react-native';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { TemaProvider, useTema } from '@/components/ui';
 import { BancoProvider } from '@/lib/banco';
 import { ContaProvider } from '@/lib/conta';
@@ -12,7 +13,8 @@ if (Platform.OS === 'web' && typeof navigator !== 'undefined') {
 
 export default function Layout() {
   return (
-    <BancoProvider
+    <SafeAreaProvider>
+      <BancoProvider
       carregando={
         <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
           <ActivityIndicator color="#2F7D5B" />
@@ -24,7 +26,8 @@ export default function Layout() {
           <Navegacao />
         </ContaProvider>
       </TemaProvider>
-    </BancoProvider>
+      </BancoProvider>
+    </SafeAreaProvider>
   );
 }
 

@@ -42,6 +42,13 @@ const tags = [
 
 const indexUrl = new URL('index.html', dist);
 let html = readFileSync(indexUrl, 'utf8');
+
+// viewport-fit=cover: sem isso o iPhone não informa a faixa do indicador de início,
+// e a barra de abas fica colada na borda de baixo.
+html = html.replace(
+  /(<meta name="viewport" content="[^"]*)"/,
+  (todo, inicio) => (todo.includes('viewport-fit') ? todo : `${inicio}, viewport-fit=cover"`),
+);
 if (!html.includes('rel="manifest"')) {
   html = html
     .replace('<html lang="en">', '<html lang="pt-BR">')
