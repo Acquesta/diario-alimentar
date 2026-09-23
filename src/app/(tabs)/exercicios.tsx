@@ -1,7 +1,7 @@
 import { router, useFocusEffect } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
 import { Pressable, ScrollView, Text, TextInput, View } from 'react-native';
-import { Botao, Cartao, Chip, formatar, useTema } from '@/components/ui';
+import { AvisoDesfazer, Botao, Cartao, Chip, formatar, useTema } from '@/components/ui';
 import { useAoAlterar, useBanco } from '@/lib/banco';
 import { hoje, rotulo, somarDias } from '@/lib/dates';
 import {
@@ -156,38 +156,14 @@ export default function TelaExercicios() {
       </ScrollView>
 
       {removido ? (
-        <View
-          accessibilityLiveRegion="polite"
-          style={[
-            estilos.cartao,
-            {
-              position: 'absolute',
-              left: 16,
-              right: 16,
-              bottom: 24,
-              flexDirection: 'row',
-              alignItems: 'center',
-              backgroundColor: cores.texto,
-              borderColor: cores.texto,
-            },
-          ]}
-        >
-          <Text style={{ flex: 1, color: cores.fundo }} numberOfLines={1}>
-            Treino removido
-          </Text>
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel="Desfazer remoção"
-            hitSlop={8}
-            onPress={async () => {
-              await restaurarExercicio(db, removido);
-              setRemovido(null);
-              carregar();
-            }}
-          >
-            <Text style={{ color: cores.fundo, fontWeight: '700', textDecorationLine: 'underline' }}>Desfazer</Text>
-          </Pressable>
-        </View>
+        <AvisoDesfazer
+          texto={`Treino removido`}
+          onDesfazer={async () => {
+            await restaurarExercicio(db, removido);
+            setRemovido(null);
+            carregar();
+          }}
+        />
       ) : null}
     </View>
   );

@@ -1,10 +1,12 @@
 import { Ionicons } from '@expo/vector-icons';
+import { BlurView } from 'expo-blur';
 import { Tabs } from 'expo-router';
+import { Platform, StyleSheet } from 'react-native';
 import { useTema } from '@/components/ui';
 
 /** As quatro áreas do app. O que abre de dentro delas fica na pilha de cima. */
 export default function AbasLayout() {
-  const { cores } = useTema();
+  const { cores, escuro } = useTema();
   return (
     <Tabs
       screenOptions={{
@@ -15,7 +17,18 @@ export default function AbasLayout() {
         sceneStyle: { backgroundColor: cores.fundo },
         tabBarActiveTintColor: cores.primaria,
         tabBarInactiveTintColor: cores.suave,
-        tabBarStyle: { backgroundColor: cores.cartao, borderTopColor: cores.borda },
+        // A barra fica translúcida e o conteúdo passa por baixo dela ao rolar.
+        tabBarStyle: Platform.select({
+          web: { backgroundColor: 'transparent', borderTopColor: cores.borda, position: 'absolute' },
+          default: { backgroundColor: 'transparent', borderTopColor: cores.borda, position: 'absolute' },
+        }),
+        tabBarBackground: () => (
+          <BlurView
+            intensity={60}
+            tint={escuro ? 'dark' : 'light'}
+            style={[StyleSheet.absoluteFill, { backgroundColor: cores.cartao + 'B3' }]}
+          />
+        ),
       }}
     >
       <Tabs.Screen

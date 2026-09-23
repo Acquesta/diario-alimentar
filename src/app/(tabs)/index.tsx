@@ -2,7 +2,7 @@ import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { useAoAlterar, useBanco } from '@/lib/banco';
 import { useCallback, useEffect, useState } from 'react';
 import { Pressable, ScrollView, Text, View } from 'react-native';
-import { Barra, Botao, Cartao, formatar, useTema } from '@/components/ui';
+import { AvisoDesfazer, Barra, Botao, Cartao, formatar, useTema } from '@/components/ui';
 import { hoje, rotulo, somarDias } from '@/lib/dates';
 import {
   lerPerfil,
@@ -115,38 +115,14 @@ export default function Diario() {
       </ScrollView>
 
       {removido ? (
-        <View
-          accessibilityLiveRegion="polite"
-          style={[
-            estilos.cartao,
-            {
-              position: 'absolute',
-              left: 16,
-              right: 16,
-              bottom: 24,
-              flexDirection: 'row',
-              alignItems: 'center',
-              backgroundColor: cores.texto,
-              borderColor: cores.texto,
-            },
-          ]}
-        >
-          <Text style={{ flex: 1, color: cores.fundo }} numberOfLines={1}>
-            {removido.nome} removido
-          </Text>
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel="Desfazer remoção"
-            hitSlop={8}
-            onPress={async () => {
-              await restaurarRegistro(db, removido);
-              setRemovido(null);
-              carregar();
-            }}
-          >
-            <Text style={{ color: cores.fundo, fontWeight: '700', textDecorationLine: 'underline' }}>Desfazer</Text>
-          </Pressable>
-        </View>
+        <AvisoDesfazer
+          texto={`${removido.nome} removido`}
+          onDesfazer={async () => {
+            await restaurarRegistro(db, removido);
+            setRemovido(null);
+            carregar();
+          }}
+        />
       ) : null}
     </View>
   );
@@ -199,10 +175,10 @@ function Resumo({
           <Text style={estilos.suave}>de {meta.kcal} kcal</Text>
         </View>
         <View style={{ alignItems: 'flex-end' }}>
-          <Text style={[estilos.titulo, { color: restante < 0 ? cores.excesso : cores.primaria, fontVariant: ['tabular-nums'] }]}>
-            {Math.abs(restante)} kcal
+          <Text style={[estilos.numeroMedio, { color: restante < 0 ? cores.excesso : cores.primaria }]}>
+            {Math.abs(restante)}
           </Text>
-          <Text style={estilos.suave}>{restante < 0 ? 'acima da meta' : 'restantes'}</Text>
+          <Text style={estilos.suave}>{restante < 0 ? 'kcal acima da meta' : 'kcal restantes'}</Text>
         </View>
       </View>
       {kcalExercicio > 0 && metaBase !== null ? (
@@ -267,7 +243,7 @@ function SecaoRefeicao({
 
       <View style={{ flexDirection: 'row', gap: 8, flexWrap: 'wrap' }}>
         <View style={{ flexGrow: 1 }}>
-          <Botao titulo="+ Adicionar" tipo="secundario" onPress={onAdicionar} />
+          <Botao titulo="+ Adicionar" tipo="contorno" onPress={onAdicionar} />
         </View>
         {itens.length === 0 && anterior ? (
           <View style={{ flexGrow: 1 }}>
