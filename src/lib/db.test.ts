@@ -2,7 +2,23 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import initSqlJs from 'sql.js';
 import { BancoSqlJs } from './banco-web.ts';
-import { lerPerfil, lerPeso, listarAgua, listarExercicios, migrar, salvarPerfil, salvarPeso, VERSAO } from './db.ts';
+import {
+  apagarRotina,
+  lerPerfil,
+  lerPeso,
+  lerRotina,
+  listarDiasComRotina,
+  listarAgua,
+  listarExercicios,
+  migrar,
+  registrarExercicio,
+  removerExercicio,
+  restaurarExercicio,
+  salvarPerfil,
+  salvarPeso,
+  salvarRotina,
+  VERSAO,
+} from './db.ts';
 import type { Banco } from './banco-tipos.ts';
 
 async function bancoVazio(): Promise<Banco> {
@@ -123,4 +139,122 @@ test('migrar para a versão 5 acrescenta o foco sem mexer nos treinos já gravad
   assert.equal(treinos.length, 1);
   assert.equal(treinos[0].kcal, 200);
   assert.equal(treinos[0].foco, null);
+});
+
+test('treino detalhado grava, lê e remove os exercícios junto', async () => {
+  const db = await bancoVazio();
+  await migrar(db);
+  await registrarExercicio(db, '2026-09-23', {
+    tipo: 'musculacao',
+    intensidade: 'moderado',
+    foco: null,
+    minutos: 60,
+    distanciaKm: null,
+    kcal: 210,
+    itens: [
+      { catalogo: 'agachamento', nome: 'Agachamento livre', series: 4, repeticoes: 10, cargaKg: 80 },
+      { catalogo: null, nome: 'Escada', series: 3, repeticoes: 12, cargaKg: null },
+    ],
+  });
+
+  const treinos = await listarExercicios(db, '2026-09-23');
+  assert.equal(treinos.length, 1);
+  assert.deepEqual(treinos[0].itens?.map((i) => i.nome), ['Agachamento livre', 'Escada']);
+  assert.equal(treinos[0].itens?.[0].cargaKg, 80);
+  assert.equal(treinos[0].itens?.[1].catalogo, null);
+
+  await removerExercicio(db, treinos[0].id);
+  const sobrou = await db.getAllAsync('SELECT id FROM exercicio_itens');
+  assert.equal(sobrou.length, 0);
+});
+
+test('desfazer a remoção traz o treino e os exercícios de volta', async () => {
+  const db = await bancoVazio();
+  await migrar(db);
+  await registrarExercicio(db, '2026-09-23', {
+    tipo: 'musculacao',
+    intensidade: 'moderado',
+    foco: null,
+    minutos: 45,
+    distanciaKm: null,
+    kcal: 180,
+    itens: [{ catalogo: 'supino', nome: 'Supino reto', series: 3, repeticoes: 10, cargaKg: 60 }],
+  });
+  const [treino] = await listarExercicios(db, '2026-09-23');
+  await removerExercicio(db, treino.id);
+  await restaurarExercicio(db, treino);
+
+  const [voltou] = await listarExercicios(db, '2026-09-23');
+  assert.equal(voltou.id, treino.id);
+  assert.deepEqual(voltou.itens, treino.itens);
+});
+
+test('treino sem lista de exercícios vem sem itens', async () => {
+  const db = await bancoVazio();
+  await migrar(db);
+  await registrarExercicio(db, '2026-09-23', {
+    tipo: 'caminhada',
+    intensidade: 'moderado',
+    foco: null,
+    minutos: 30,
+    distanciaKm: null,
+    kcal: 116,
+  });
+  const [treino] = await listarExercicios(db, '2026-09-23');
+  assert.deepEqual(treino.itens, []);
+});
+
+test('rotina do dia da semana guarda, lê e troca', async () => {
+  const db = await bancoVazio();
+  await migrar(db);
+  const segunda = [
+    { catalogo: 'agachamento', nome: 'Agachamento livre', series: 4, repeticoes: 10, cargaKg: 80 },
+    { catalogo: 'leg-press', nome: 'Leg press', series: 3, repeticoes: 12, cargaKg: 120 },
+  ];
+  await salvarRotina(db, 1, 60, segunda);
+
+  const lida = await lerRotina(db, 1);
+  assert.equal(lida?.minutos, 60);
+  assert.deepEqual(lida?.itens, segunda);
+  assert.deepEqual(await listarDiasComRotina(db), [1]);
+  assert.equal(await lerRotina(db, 2), null);
+
+  // Salvar de novo troca a rotina inteira, sem duplicar exercício.
+  await salvarRotina(db, 1, 45, [segunda[0]]);
+  const trocada = await lerRotina(db, 1);
+  assert.equal(trocada?.itens.length, 1);
+  assert.equal(trocada?.minutos, 45);
+});
+
+test('apagar rotina some com o dia da lista', async () => {
+  const db = await bancoVazio();
+  await migrar(db);
+  await salvarRotina(db, 3, 40, [{ catalogo: 'supino', nome: 'Supino reto', series: 3, repeticoes: 10, cargaKg: 60 }]);
+  await apagarRotina(db, 3);
+  assert.equal(await lerRotina(db, 3), null);
+  assert.deepEqual(await listarDiasComRotina(db), []);
+});
+
+test('rotina sem exercício não é guardada', async () => {
+  const db = await bancoVazio();
+  await migrar(db);
+  await salvarRotina(db, 5, 30, []);
+  assert.equal(await lerRotina(db, 5), null);
+});
+
+test('treino antigo continua depois de migrar para a versão 7', async () => {
+  const db = await bancoNaVersao3();
+  await migrar(db);
+  await registrarExercicio(db, '2026-09-23', {
+    tipo: 'musculacao',
+    intensidade: 'moderado',
+    foco: 'composto',
+    minutos: 60,
+    distanciaKm: null,
+    kcal: 240,
+  });
+  await migrar(db);
+  const [treino] = await listarExercicios(db, '2026-09-23');
+  assert.equal(treino.kcal, 240);
+  assert.deepEqual(await listarDiasComRotina(db), []);
 });

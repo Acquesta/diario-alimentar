@@ -34,3 +34,16 @@ function formatar(d: Date): string {
   const dd = String(d.getDate()).padStart(2, '0');
   return `${d.getFullYear()}-${mm}-${dd}`;
 }
+
+/** Dia da semana da data: 0 domingo, 6 sábado, como o JavaScript conta. */
+export function diaDaSemana(data: string): number {
+  const [a, m, d] = data.split('-').map(Number);
+  return new Date(a, m - 1, d).getDay();
+}
+
+const DIAS = ['domingo', 'segunda-feira', 'terça-feira', 'quarta-feira', 'quinta-feira', 'sexta-feira', 'sábado'];
+
+/** Nome do dia da semana em minúsculas (ex.: "segunda-feira"). */
+export function nomeDiaDaSemana(dia: number): string {
+  return DIAS[dia] ?? '';
+}
