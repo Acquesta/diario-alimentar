@@ -4,6 +4,7 @@
 // A marca é um anel de progresso aberto (quanto ainda falta comer no dia, que é a
 // pergunta do app) com um garfo no meio. Sem letras, para ler bem em tamanho pequeno.
 import { mkdirSync, writeFileSync } from 'node:fs';
+import { mdiArmFlexOutline } from '@mdi/js';
 import sharp from 'sharp';
 
 const VERDE = '#5CC08F';
@@ -11,18 +12,19 @@ const VERDE_ESCURO = '#2F7D5B';
 const FUNDO = '#11201A';
 const CLARO = '#F2F6F4';
 
-/** Anel aberto em cima, como um prato visto de cima com uma parte já comida. */
-function anel(cor, largura = 84) {
-  return `
-    <circle cx="512" cy="512" r="330" fill="none" stroke="${cor}" stroke-opacity="0.22" stroke-width="${largura}" />
-    <path d="M 512 182 A 330 330 0 1 1 256 838" fill="none" stroke="${cor}"
-          stroke-width="${largura}" stroke-linecap="round" />`;
+/**
+ * Braço flexionado em traçado, o desenho arm-flex-outline do Material Design Icons
+ * (Pictogrammers, Apache-2.0). Fica no centro, com folga nas bordas.
+ */
+function braco(cor) {
+  return `<g transform="translate(104 128) scale(34.6)"><path d="${mdiArmFlexOutline}" fill="${cor}" /></g>`;
 }
 
-/** Garfo simples: três dentes, cabo reto. */
-function garfo(cor) {
+/** Garfo simples: três dentes, cabo reto. `contorno` abre espaço quando ele cruza o braço. */
+function garfo(cor, contorno) {
+  const traco = contorno ? `stroke="${contorno}" stroke-width="46" stroke-linejoin="round"` : '';
   return `
-    <g fill="${cor}">
+    <g fill="${cor}" ${traco}>
       <rect x="404" y="318" width="30" height="190" rx="15" />
       <rect x="497" y="318" width="30" height="190" rx="15" />
       <rect x="590" y="318" width="30" height="190" rx="15" />
@@ -31,21 +33,31 @@ function garfo(cor) {
     </g>`;
 }
 
+/** O garfo entra no músculo pela direita, inclinado, com os dentes fincados. */
+function garfoEspetado(cor) {
+  // Centro do garfo em (660, 372), virado 215 graus: os dentes entram no músculo.
+  // O primeiro desenho, na cor do fundo, abre a folga por onde ele atravessa o braço.
+  const posicao = 'translate(626 430) rotate(215) scale(0.72) translate(-512 -512)';
+  return `
+    <g transform="${posicao}">${garfo(FUNDO, FUNDO)}</g>
+    <g transform="${posicao}">${garfo(cor)}</g>`;
+}
+
 const svgIcone = `<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
   <rect width="1024" height="1024" fill="${FUNDO}" />
-  ${anel(VERDE)}
-  ${garfo(CLARO)}
+  ${braco(VERDE)}
+  ${garfoEspetado(CLARO)}
 </svg>`;
 
 /** Para a tela de abertura e o Android, só a marca, sem fundo. */
 const svgMarca = `<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
-  ${anel(VERDE)}
-  ${garfo(CLARO)}
+  ${braco(VERDE)}
+  ${garfoEspetado(CLARO)}
 </svg>`;
 
 const svgMonocromatico = `<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
-  ${anel('#FFFFFF')}
-  ${garfo('#FFFFFF')}
+  ${braco('#FFFFFF')}
+  ${garfoEspetado('#FFFFFF')}
 </svg>`;
 
 const svgFundoAndroid = `<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
@@ -55,8 +67,8 @@ const svgFundoAndroid = `<svg xmlns="http://www.w3.org/2000/svg" width="1024" he
 /** O ícone do Android fica dentro de uma máscara, então a marca entra menor. */
 const svgMarcaAndroid = `<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
   <g transform="translate(512 512) scale(0.62) translate(-512 -512)">
-    ${anel(VERDE)}
-    ${garfo(CLARO)}
+    ${braco(VERDE)}
+    ${garfoEspetado(CLARO)}
   </g>
 </svg>`;
 
@@ -77,4 +89,4 @@ for (const [caminho, svg, tamanho] of arquivos) {
 
 // Guarda o desenho, para poder ajustar depois sem refazer tudo.
 writeFileSync('assets/icone.svg', svgIcone);
-console.log('desenho em assets/icone.svg. Cor de fundo:', FUNDO, '· anel:', VERDE, '· escuro:', VERDE_ESCURO);
+console.log('desenho em assets/icone.svg. Fundo:', FUNDO, '· braço:', VERDE, '· garfo:', CLARO);
