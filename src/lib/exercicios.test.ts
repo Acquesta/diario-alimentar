@@ -1,21 +1,34 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { descrever, gastoDoDia, gastoTreino, type Treino } from './exercicios.ts';
+import {
+  acharExercicio,
+  buscarExercicios,
+  CATALOGO,
+  descrever,
+  gastoDetalhado,
+  gastoDoDia,
+  gastoTreino,
+  MET_DESCANSO,
+  minutosSobTensao,
+  volumeCarga,
+  type ItemTreino,
+  type Treino,
+} from './exercicios.ts';
 import { metaAgua, metaDiaria, type Perfil } from './nutrition.ts';
 
 const base: Treino = {
   tipo: 'musculacao', intensidade: 'moderado', foco: 'composto', minutos: 60, distanciaKm: null, kcal: null,
 };
 
-test('musculação usa o MET líquido, conforme o foco do treino', () => {
-  // Composto: (5,0 − 1) × 80 kg × 1 h = 320
-  assert.equal(gastoTreino(base, 80), 320);
-  // Composto intenso: (6,5 − 1) × 80 × 0,75 h = 330
-  assert.equal(gastoTreino({ ...base, intensidade: 'intenso', minutos: 45 }, 80), 330);
-  // Isolado: (3,5 − 1) × 80 × 1 h = 200
-  assert.equal(gastoTreino({ ...base, foco: 'isolado' }, 80), 200);
-  // Isolado intenso: (5,0 − 1) × 80 × 1 h = 320
-  assert.equal(gastoTreino({ ...base, foco: 'isolado', intensidade: 'intenso' }, 80), 320);
+test('musculação sem lista usa o MET líquido do foco', () => {
+  // Composto: (4,0 − 1) × 80 kg × 1 h = 240
+  assert.equal(gastoTreino(base, 80), 240);
+  // Composto intenso: (5,5 − 1) × 80 × 0,75 h = 270
+  assert.equal(gastoTreino({ ...base, intensidade: 'intenso', minutos: 45 }, 80), 270);
+  // Isolado: (3,0 − 1) × 80 × 1 h = 160
+  assert.equal(gastoTreino({ ...base, foco: 'isolado' }, 80), 160);
+  // Isolado intenso: (4,0 − 1) × 80 × 1 h = 240
+  assert.equal(gastoTreino({ ...base, foco: 'isolado', intensidade: 'intenso' }, 80), 240);
 });
 
 test('treino de pernas gasta mais que treino de braço no mesmo tempo', () => {
@@ -67,8 +80,110 @@ test('gasto do dia soma os treinos', () => {
   assert.equal(gastoDoDia([]), 0);
 });
 
+const item = (catalogo: string, series = 3, repeticoes = 10, cargaKg: number | null = 40): ItemTreino => ({
+  catalogo,
+  nome: acharExercicio(catalogo)?.nome ?? catalogo,
+  series,
+  repeticoes,
+  cargaKg,
+});
+
+test('tempo sob tensão: 3 s por repetição', () => {
+  // 3 séries × 10 reps × 3 s = 90 s = 1,5 min
+  assert.equal(minutosSobTensao([item('supino')]), 1.5);
+  assert.equal(minutosSobTensao([]), 0);
+  assert.equal(minutosSobTensao([item('supino', 0, 10)]), 0);
+});
+
+test('exercícios diferentes gastam diferente nas mesmas séries', () => {
+  const agachamento = gastoDetalhado([item('agachamento')], null, 80);
+  const supino = gastoDetalhado([item('supino')], null, 80);
+  const rosca = gastoDetalhado([item('rosca-direta')], null, 80);
+  assert.ok(agachamento > supino, `agachamento ${agachamento} devia passar supino ${supino}`);
+  assert.ok(supino > rosca, `supino ${supino} devia passar rosca ${rosca}`);
+  // Agachamento: (9,0 − 1) × 80 × (90 s / 3600) = 16
+  assert.equal(agachamento, 16);
+});
+
+test('mais séries e mais repetições gastam mais', () => {
+  const tres = gastoDetalhado([item('supino', 3, 10)], null, 80);
+  const cinco = gastoDetalhado([item('supino', 5, 10)], null, 80);
+  const quinze = gastoDetalhado([item('supino', 3, 15)], null, 80);
+  assert.ok(cinco > tres && quinze > tres);
+});
+
+test('o descanso entra no cálculo, acima do repouso', () => {
+  const itens = [item('agachamento')];
+  const so_series = gastoDetalhado(itens, null, 80);
+  const com_descanso = gastoDetalhado(itens, 30, 80);
+  // Descanso: (3,0 − 1) × 80 × (28,5 min / 60) = 76
+  assert.equal(com_descanso - so_series, 76);
+  assert.equal(MET_DESCANSO, 3.0);
+  // Duração menor que o tempo das séries não vira desconto.
+  assert.equal(gastoDetalhado(itens, 1, 80), so_series);
+});
+
+test('treino inteiro fica na faixa que os estudos medem', () => {
+  // Sessão de 60 min, 80 kg: 4 a 8 kcal/min contando o descanso, já com o
+  // repouso somado de volta (1 MET × 80 kg × 1 h = 80 kcal).
+  const treino = [
+    item('agachamento', 4, 10),
+    item('leg-press', 3, 12),
+    item('supino', 4, 10),
+    item('remada-curvada', 3, 10),
+    item('rosca-direta', 3, 12),
+    item('triceps-corda', 3, 12),
+  ];
+  const liquido = gastoDetalhado(treino, 60, 80);
+  const porMinuto = (liquido + 80) / 60;
+  assert.ok(porMinuto > 4 && porMinuto < 8, `${porMinuto.toFixed(1)} kcal/min fora da faixa`);
+});
+
+test('lista detalhada manda no cálculo do treino', () => {
+  const comLista: Treino = { ...base, itens: [item('rosca-direta', 3, 12)] };
+  const semLista = gastoTreino(base, 80);
+  assert.equal(gastoTreino(comLista, 80), gastoDetalhado(comLista.itens!, 60, 80));
+  assert.notEqual(gastoTreino(comLista, 80), semLista);
+  // Lista vazia volta para o modo rápido.
+  assert.equal(gastoTreino({ ...base, itens: [] }, 80), semLista);
+});
+
+test('exercício fora do catálogo usa o MET do meio', () => {
+  const fora: ItemTreino = { catalogo: null, nome: 'Escada', series: 3, repeticoes: 10, cargaKg: null };
+  // (6,0 − 1) × 80 × (90 s / 3600) = 10
+  assert.equal(gastoDetalhado([fora], null, 80), 10);
+});
+
+test('sem peso ou sem exercício o gasto detalhado é zero', () => {
+  assert.equal(gastoDetalhado([item('supino')], 60, 0), 0);
+  assert.equal(gastoDetalhado([], 60, 80), 0);
+});
+
+test('volume de carga soma o que foi levantado', () => {
+  // 3 × 10 × 40 kg + 3 × 12 × 20 kg = 1200 + 720
+  assert.equal(volumeCarga([item('supino', 3, 10, 40), item('rosca-direta', 3, 12, 20)]), 1920);
+  assert.equal(volumeCarga([item('barra-fixa', 3, 8, null)]), 0);
+});
+
+test('busca de exercício ignora acento e maiúscula', () => {
+  assert.ok(buscarExercicios('triceps').some((e) => e.id === 'triceps-corda'));
+  assert.ok(buscarExercicios('AGACH').some((e) => e.id === 'agachamento'));
+  assert.equal(buscarExercicios('xyz').length, 0);
+  assert.ok(buscarExercicios('').length > 0);
+});
+
+test('catálogo não tem id repetido e todo MET é positivo', () => {
+  const ids = new Set(CATALOGO.map((e) => e.id));
+  assert.equal(ids.size, CATALOGO.length);
+  assert.ok(CATALOGO.every((e) => e.met > 1));
+});
+
 test('descrição do treino', () => {
   assert.equal(descrever(base), 'Musculação · 60 min · moderado · pernas ou corpo todo');
+  assert.equal(
+    descrever({ ...base, itens: [item('supino'), item('rosca-direta', 4, 10)] }),
+    'Musculação · 60 min · 2 exercícios · 7 séries',
+  );
   assert.equal(
     descrever({ tipo: 'corrida', intensidade: null, minutos: null, distanciaKm: 5.5, kcal: null }),
     'Corrida · 5,5 km',
