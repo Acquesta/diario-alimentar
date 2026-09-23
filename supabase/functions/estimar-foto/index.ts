@@ -13,11 +13,19 @@ const cors = {
 const TETO_DIARIO = 20;
 /** Tamanho maximo da imagem depois da reducao feita no aparelho. */
 const LIMITE_IMAGEM = 4 * 1024 * 1024;
-/** Da para trocar pelo segredo GEMINI_MODELO sem mexer no codigo. */
-const MODELO = Deno.env.get("GEMINI_MODELO") ?? "gemini-3.6-flash";
-/** O Gemini devolve 503 quando esta cheio. Vale esperar e tentar de novo. */
-const TENTATIVAS = 3;
-const ESPERA_MS = [800, 2500];
+/**
+ * Modelos na ordem de preferencia. Quando um esta lotado, o proximo assume.
+ * Da para trocar a lista pelo segredo GEMINI_MODELOS, separando por virgula.
+ */
+const MODELOS = (Deno.env.get("GEMINI_MODELOS") ?? Deno.env.get("GEMINI_MODELO") ??
+  "gemini-3.5-flash-lite,gemini-3.6-flash,gemini-3.8-flash")
+  .split(",").map((m) => m.trim()).filter(Boolean);
+/** Quanto esperar por uma tentativa. Sem isso a chamada fica pendurada. */
+const TEMPO_TENTATIVA_MS = 35_000;
+/** Teto somando todas as tentativas. O worker do Supabase morre aos 150 s. */
+const ORCAMENTO_MS = 110_000;
+/** Quantas voltas na lista de modelos. */
+const RODADAS = 2;
 
 const INSTRUCAO = `Voce recebe a foto de um prato de comida brasileiro.
 Liste os alimentos que aparecem, com a quantidade estimada em gramas e os valores
@@ -48,7 +56,7 @@ type Item = {
   confianca: string;
 };
 
-/** Le a resposta do modelo, que as vezes vem embrulhada em ```json. */
+/** Le a resposta do modelo, que as vezes vem embrulhada em cercas de codigo. */
 function lerItens(texto: string): Item[] | null {
   const limpo = texto.trim().replace(/^```(?:json)?/i, "").replace(/```$/, "").trim();
   let cru: unknown;
@@ -86,6 +94,9 @@ function lerItens(texto: string): Item[] | null {
 }
 
 const espera = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
+/** O que aconteceu em cada tentativa, para o log e para a resposta de erro. */
+type Tentativa = { modelo: string; status: number | string; ms: number };
 
 Deno.serve(async (req: Request) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: cors });
@@ -126,8 +137,6 @@ Deno.serve(async (req: Request) => {
     return resposta({ erro: `Voce ja usou as ${TETO_DIARIO} fotos de hoje. Tente amanha.` }, 429);
   }
 
-  const endereco =
-    `https://generativelanguage.googleapis.com/v1beta/models/${MODELO}:generateContent?key=${chave}`;
   const pedido = {
     contents: [{
       parts: [
@@ -138,39 +147,64 @@ Deno.serve(async (req: Request) => {
     generationConfig: { temperature: 0.2, responseMimeType: "application/json" },
   };
 
+  const comeco = Date.now();
+  const restante = () => ORCAMENTO_MS - (Date.now() - comeco);
+  const tentativas: Tentativa[] = [];
+  /** Modelo que nao existe mais nao volta nas proximas rodadas. */
+  const semModelo = new Set<string>();
   let textoModelo = "";
-  let ultimoStatus = 0;
-  for (let tentativa = 0; tentativa < TENTATIVAS; tentativa++) {
-    if (tentativa > 0) await espera(ESPERA_MS[tentativa - 1] ?? 2500);
-    try {
-      const r = await fetch(endereco, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(pedido),
-      });
-      if (r.ok) {
-        const json = await r.json();
-        textoModelo = json?.candidates?.[0]?.content?.parts?.map((p: { text?: string }) => p.text ?? "").join("") ?? "";
-        break;
+  let modeloUsado = "";
+
+  busca:
+  for (let rodada = 0; rodada < RODADAS; rodada++) {
+    for (const modelo of MODELOS) {
+      if (semModelo.has(modelo)) continue;
+      if (restante() < 5_000) break busca;
+      if (tentativas.length > 0) await espera(rodada === 0 ? 300 : 2_000);
+
+      const t0 = Date.now();
+      try {
+        const r = await fetch(
+          `https://generativelanguage.googleapis.com/v1beta/models/${modelo}:generateContent?key=${chave}`,
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(pedido),
+            signal: AbortSignal.timeout(Math.min(TEMPO_TENTATIVA_MS, Math.max(5_000, restante()))),
+          },
+        );
+        tentativas.push({ modelo, status: r.status, ms: Date.now() - t0 });
+        if (r.ok) {
+          const json = await r.json();
+          textoModelo = json?.candidates?.[0]?.content?.parts
+            ?.map((p: { text?: string }) => p.text ?? "").join("") ?? "";
+          modeloUsado = modelo;
+          break busca;
+        }
+        const detalhe = await r.text();
+        console.error("gemini", modelo, r.status, detalhe.slice(0, 300));
+        // 404 e o modelo que saiu do ar; 400 e 403 sao pedido ou chave ruim.
+        if (r.status === 404) semModelo.add(modelo);
+        if (r.status === 400 || r.status === 403) break busca;
+      } catch (e) {
+        // Estouro do tempo da tentativa cai aqui: o proximo modelo assume.
+        tentativas.push({ modelo, status: "tempo", ms: Date.now() - t0 });
+        console.error("gemini", modelo, e);
       }
-      ultimoStatus = r.status;
-      const detalhe = await r.text();
-      console.error("gemini", r.status, detalhe.slice(0, 300));
-      // 503 e 429 sao fila cheia: vale esperar. O resto nao melhora tentando de novo.
-      if (r.status !== 503 && r.status !== 429) break;
-    } catch (e) {
-      ultimoStatus = 0;
-      console.error("gemini", e);
     }
   }
 
   if (!textoModelo) {
-    const erro = ultimoStatus === 404
-      ? "O modelo configurado nao existe mais. Ajuste o segredo GEMINI_MODELO."
-      : ultimoStatus === 503 || ultimoStatus === 429
+    const status = tentativas.map((t) => t.status);
+    const erro = status.length > 0 && status.every((s) => s === 404)
+      ? "Nenhum modelo de IA da lista existe mais. Ajuste o segredo GEMINI_MODELOS."
+      : status.includes(429)
+      ? "A IA bateu o limite de uso da chave. Tente de novo mais tarde."
+      : status.includes(503) || status.includes("tempo")
       ? "A IA esta congestionada agora. Tente de novo em um minuto."
       : "A IA nao respondeu agora. Tente de novo em instantes.";
-    return resposta({ erro }, 502);
+    console.error("tentativas", JSON.stringify(tentativas));
+    return resposta({ erro, tentativas }, 502);
   }
 
   const itens = lerItens(textoModelo);
@@ -179,5 +213,5 @@ Deno.serve(async (req: Request) => {
     return resposta({ erro: "Nao consegui ler o prato desta foto." }, 422);
   }
 
-  return resposta({ itens, usadoHoje: usado, tetoDiario: TETO_DIARIO });
+  return resposta({ itens, usadoHoje: usado, tetoDiario: TETO_DIARIO, modelo: modeloUsado });
 });

@@ -22,6 +22,11 @@ import { hoje } from '@/lib/dates';
 
 /** Lado maior da foto enviada. Mais que isso não melhora a estimativa e pesa. */
 const LADO_MAXIMO = 1024;
+/**
+ * Teto de espera pela função. Ela já se corta antes disso; este aqui é a rede
+ * de segurança para a tela não ficar girando sem fim quando o servidor trava.
+ */
+const ESPERA_MAXIMA_MS = 140_000;
 
 export default function TelaEstimarFoto() {
   const { cores, estilos } = useTema();
@@ -65,10 +70,13 @@ export default function TelaEstimarFoto() {
       });
       const { data: resposta, error } = await supabase!.functions.invoke('estimar-foto', {
         body: { imagem: menor.base64, tipo: 'image/jpeg' },
+        timeout: ESPERA_MAXIMA_MS,
       });
       if (error) {
         const detalhe = await lerErro(error);
-        setErro(detalhe ?? 'Não consegui falar com o servidor agora.');
+        setErro(detalhe ?? (abortou(error)
+          ? 'A IA demorou demais para responder. Tente de novo.'
+          : 'Não consegui falar com o servidor agora.'));
         return;
       }
       const lista = lerEstimativa(resposta);
@@ -236,6 +244,12 @@ export default function TelaEstimarFoto() {
       ) : null}
     </ScrollView>
   );
+}
+
+/** O timeout do invoke chega como AbortError, sem corpo para ler. */
+function abortou(error: unknown): boolean {
+  const e = error as { name?: string; message?: string };
+  return e?.name === 'AbortError' || /abort/i.test(e?.message ?? '');
 }
 
 /** A função devolve o motivo em JSON; o supabase-js embrulha isso num erro genérico. */
