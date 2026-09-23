@@ -1,6 +1,6 @@
 import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { useAoAlterar, useBanco } from '@/lib/banco';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { Pressable, ScrollView, Text, View } from 'react-native';
 import { AvisoDesfazer, Barra, Botao, Cartao, formatar, useTema } from '@/components/ui';
 import { hoje, rotulo, somarDias } from '@/lib/dates';
@@ -32,13 +32,17 @@ export default function Diario() {
   const [removido, setRemovido] = useState<Registro | null>(null);
   const [kcalExercicio, setKcalExercicio] = useState(0);
 
+  const pedido = useRef(0);
   const carregar = useCallback(async () => {
+    const meu = ++pedido.current;
     const [regs, p, treinos] = await Promise.all([
       listarRegistros(db, data),
       lerPerfil(db),
       listarExercicios(db, data),
     ]);
     const ultimas = await Promise.all(REFEICOES.map((r) => ultimaDataDaRefeicao(db, data, r.id)));
+    // Leitura atrasada não passa por cima da mais nova.
+    if (meu !== pedido.current) return;
     setRegistros(regs);
     setPerfil(p);
     setKcalExercicio(gastoDoDia(treinos));
@@ -106,8 +110,9 @@ export default function Diario() {
               carregar();
             }}
             onRemover={async (registro) => {
-              await removerRegistro(db, registro.id);
+              setRegistros((atual) => atual.filter((x) => x.id !== registro.id));
               setRemovido(registro);
+              await removerRegistro(db, registro.id);
               carregar();
             }}
           />

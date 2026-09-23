@@ -1,5 +1,5 @@
 import { useFocusEffect } from 'expo-router';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { Pressable, ScrollView, Text, TextInput, View } from 'react-native';
 import { AvisoDesfazer, Barra, Botao, Cartao, Chip, formatar, useTema } from '@/components/ui';
 import { useAoAlterar, useBanco } from '@/lib/banco';
@@ -39,8 +39,12 @@ export default function TelaAgua() {
   const [editandoMeta, setEditandoMeta] = useState(false);
   const [metaTexto, setMetaTexto] = useState('');
 
+  const pedido = useRef(0);
   const carregar = useCallback(async () => {
+    const meu = ++pedido.current;
     const [regs, p, m] = await Promise.all([listarAgua(db, data), lerPeso(db), lerConfig(db, CHAVE_META)]);
+    // Leitura atrasada não passa por cima da mais nova.
+    if (meu !== pedido.current) return;
     setRegistros(regs);
     setPesoKg(p);
     setMetaSalva(m ? Number(m) : null);
@@ -163,8 +167,9 @@ export default function TelaAgua() {
                 </Text>
                 <Pressable
                   onPress={async () => {
-                    await removerAgua(db, r.id);
+                    setRegistros((atual) => atual.filter((x) => x.id !== r.id));
                     setRemovido(r);
+                    await removerAgua(db, r.id);
                     carregar();
                   }}
                   accessibilityRole="button"

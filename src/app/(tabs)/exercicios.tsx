@@ -1,5 +1,5 @@
 import { router, useFocusEffect } from 'expo-router';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { Pressable, ScrollView, Text, TextInput, View } from 'react-native';
 import { Ajuda, AvisoDesfazer, Botao, Cartao, Chip, formatar, useTema } from '@/components/ui';
 import { ListaExercicios } from '@/components/lista-exercicios';
@@ -46,8 +46,16 @@ export default function TelaExercicios() {
   const [removido, setRemovido] = useState<RegistroExercicio | null>(null);
   const [registrando, setRegistrando] = useState(false);
 
+  /**
+   * Cada leitura leva um número. Remover um treino faz duas escritas no banco, e
+   * cada uma avisa as telas; sem isso, a leitura do meio chegava atrasada e
+   * ressuscitava o treino apagado, já sem os exercícios.
+   */
+  const pedido = useRef(0);
   const carregar = useCallback(async () => {
+    const meu = ++pedido.current;
     const [regs, p] = await Promise.all([listarExercicios(db, data), lerPeso(db)]);
+    if (meu !== pedido.current) return;
     setRegistros(regs);
     setPesoKg(p);
   }, [db, data]);
@@ -159,8 +167,10 @@ export default function TelaExercicios() {
                 </View>
                 <Pressable
                   onPress={async () => {
-                    await removerExercicio(db, r.id);
+                    // Some da lista na hora; o banco vem atrás.
+                    setRegistros((atual) => atual.filter((x) => x.id !== r.id));
                     setRemovido(r);
+                    await removerExercicio(db, r.id);
                     carregar();
                   }}
                   accessibilityRole="button"
