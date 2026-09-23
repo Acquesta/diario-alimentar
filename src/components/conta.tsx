@@ -35,8 +35,8 @@ export function CartaoConta() {
       {!conta.usuario && !codigoEnviado && (
         <>
           <Text style={estilos.suave}>
-            Opcional. Entre com seu e-mail para guardar uma cópia do diário na nuvem e não perder nada se trocar de
-            celular ou apagar o app.
+            Entrar é opcional. Com a conta, o diário fica copiado na nuvem e volta se você trocar de celular ou apagar
+            o app.
           </Text>
           <TextInput
             style={estilos.input}
@@ -61,7 +61,7 @@ export function CartaoConta() {
       {!conta.usuario && codigoEnviado && (
         <>
           <Text style={estilos.texto}>Mandamos um código para {email.trim()}.</Text>
-          <Text style={estilos.suave}>Pode levar um minuto. Se não chegar, olhe a caixa de spam.</Text>
+          <Text style={estilos.suave}>Pode demorar um minuto. Se não chegar, olhe no spam.</Text>
           <TextInput
             style={[estilos.input, { letterSpacing: 4, fontVariant: ['tabular-nums'] }]}
             value={codigo}

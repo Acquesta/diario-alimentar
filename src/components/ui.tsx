@@ -10,7 +10,9 @@ const claro = {
   texto: '#1D2320',
   suave: '#66706B',
   borda: '#E3E6E1',
-  primaria: '#2F7D5B',
+  // Verde escurecido de #2F7D5B para #2B7354: no tom antigo, o texto sobre o
+  // fundo verde-claro ficava em 4,29 de contraste, abaixo dos 4,5 recomendados.
+  primaria: '#2B7354',
   sobrePrimaria: '#FFFFFF',
   primariaSuave: '#E3F1EA',
   perigo: '#B3261E',

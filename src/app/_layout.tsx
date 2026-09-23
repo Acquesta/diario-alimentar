@@ -1,8 +1,9 @@
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
-import { ActivityIndicator, Platform, View } from 'react-native';
+import { ActivityIndicator, Platform, StyleSheet, View } from 'react-native';
 import { Manrope_400Regular, Manrope_500Medium, Manrope_600SemiBold, Manrope_700Bold, useFonts } from '@expo-google-fonts/manrope';
-import { SafeAreaProvider } from 'react-native-safe-area-context';
+import { BlurView } from 'expo-blur';
+import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { TemaProvider, useTema } from '@/components/ui';
 import { BancoProvider } from '@/lib/banco';
 import { ContaProvider } from '@/lib/conta';
@@ -40,8 +41,12 @@ function Espera() {
   );
 }
 
+/** Altura do cabeçalho das telas de dentro, sem a faixa de cima do aparelho. */
+const ALTURA_CABECALHO = 56;
+
 function Navegacao() {
   const { cores, escuro } = useTema();
+  const margens = useSafeAreaInsets();
 
   // Na web, pinta o fundo da página e a barra do navegador com a cor do tema.
   if (Platform.OS === 'web' && typeof document !== 'undefined') {
@@ -55,11 +60,19 @@ function Navegacao() {
       <StatusBar style={escuro ? 'light' : 'dark'} />
       <Stack
         screenOptions={{
-          headerStyle: { backgroundColor: cores.fundo },
+          // Cabeçalho translúcido: o conteúdo passa por baixo ao rolar.
+          headerTransparent: true,
           headerShadowVisible: false,
           headerTintColor: cores.primaria,
           headerTitleStyle: { color: cores.texto, fontFamily: 'Manrope_600SemiBold' },
-          contentStyle: { backgroundColor: cores.fundo },
+          headerBackground: () => (
+            <BlurView
+              intensity={60}
+              tint={escuro ? 'dark' : 'light'}
+              style={[StyleSheet.absoluteFill, { backgroundColor: cores.fundo + 'B3' }]}
+            />
+          ),
+          contentStyle: { backgroundColor: cores.fundo, paddingTop: ALTURA_CABECALHO + margens.top },
         }}
       >
         <Stack.Screen name="(tabs)" options={{ headerShown: false }} />

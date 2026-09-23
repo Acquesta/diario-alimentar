@@ -136,8 +136,8 @@ export default function TelaPerfil() {
           </View>
         ))}
         <Text style={estilos.suave}>
-          Conte aqui só o seu dia a dia, sem os treinos. Os treinos entram na aba Exercícios e somam na meta do dia.
-          Escolher um nível alto aqui e também registrar os treinos conta o esforço duas vezes.
+          Conte aqui só o seu dia a dia, sem os treinos. Eles entram na aba Exercícios e somam na meta.
+          Marcar um nível alto aqui e ainda registrar treino conta o mesmo esforço duas vezes.
         </Text>
       </Cartao>
 
@@ -161,7 +161,7 @@ export default function TelaPerfil() {
             <Text style={estilos.suave}>
               {perfil.metaManual
                 ? `Meta manual. A calculada seria ${metaCalculada(perfil)} kcal.`
-                : 'Calculada pela equação de Mifflin-St Jeor com seu nível de atividade. É uma estimativa; um nutricionista pode ajustar.'}
+                : 'Calculada pela fórmula de Mifflin-St Jeor com o seu nível de atividade. É uma estimativa, e um nutricionista pode ajustar.'}
             </Text>
           </>
         ) : (
@@ -187,9 +187,9 @@ export default function TelaPerfil() {
           ))}
         </View>
         <Text style={estilos.suave}>
-          Seus dados ficam neste aparelho ({armazenamento === 'sqlite' ? 'SQLite' : 'modo compatível, IndexedDB'}).
+          Seus dados ficam neste aparelho{armazenamento === 'sqlite' ? '' : ', em modo compatível'}.
         </Text>
-        <Text style={estilos.suave}>Muda na hora. “Automático” segue o modo claro ou escuro do celular.</Text>
+        <Text style={estilos.suave}>Muda na hora. Em "Automático", o app segue o modo claro ou escuro do celular.</Text>
       </Cartao>
 
       <CartaoConta />

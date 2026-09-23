@@ -84,7 +84,7 @@ export default function TelaExercicios() {
           <Text style={estilos.numero}>{total} kcal</Text>
           <Text style={estilos.suave}>
             {total > 0
-              ? 'Gasto dos treinos de hoje. Esse valor soma na sua meta de calorias do dia.'
+              ? 'Gasto dos treinos de hoje. Isso soma na sua meta de calorias.'
               : 'Nenhum treino registrado hoje.'}
           </Text>
         </Cartao>
@@ -93,7 +93,7 @@ export default function TelaExercicios() {
           <Cartao>
             <Text style={estilos.titulo}>Falta seu peso</Text>
             <Text style={estilos.suave}>
-              O gasto do treino depende do seu peso. Preencha o perfil para o app calcular.
+              O cálculo do treino usa o seu peso. Preencha o perfil primeiro.
             </Text>
             <Botao titulo="Ir para o Perfil" tipo="secundario" onPress={() => router.push('/perfil')} />
           </Cartao>
@@ -279,7 +279,7 @@ function Formulario({
         <Text style={[estilos.suave, { textAlign: 'center' }]}>
           {tipo === 'outro'
             ? 'Valor informado por você.'
-            : `Gasto além do que seu corpo gastaria parado, com ${formatar(pesoKg)} kg.`}
+            : `Gasto a mais do que seu corpo gastaria parado, com ${formatar(pesoKg)} kg.`}
         </Text>
       </View>
 
