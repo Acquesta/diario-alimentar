@@ -1,9 +1,7 @@
-import { ArchivoNarrow_700Bold, useFonts } from '@expo-google-fonts/archivo-narrow';
-import { PublicSans_400Regular, PublicSans_500Medium, PublicSans_600SemiBold } from '@expo-google-fonts/public-sans';
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { ActivityIndicator, Platform, View } from 'react-native';
-import { FONTES, TemaProvider, useTema } from '@/components/ui';
+import { TemaProvider, useTema } from '@/components/ui';
 import { BancoProvider } from '@/lib/banco';
 import { ContaProvider } from '@/lib/conta';
 
@@ -13,30 +11,20 @@ if (Platform.OS === 'web' && typeof navigator !== 'undefined') {
 }
 
 export default function Layout() {
-  const [fontesProntas] = useFonts({
-    ArchivoNarrow_700Bold,
-    PublicSans_400Regular,
-    PublicSans_500Medium,
-    PublicSans_600SemiBold,
-  });
-
   return (
     <BancoProvider
-      carregando={<Carregando />}
+      carregando={
+        <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
+          <ActivityIndicator color="#2F7D5B" />
+        </View>
+      }
     >
       <TemaProvider>
-        <ContaProvider>{fontesProntas ? <Navegacao /> : <Carregando />}</ContaProvider>
+        <ContaProvider>
+          <Navegacao />
+        </ContaProvider>
       </TemaProvider>
     </BancoProvider>
-  );
-}
-
-/** Tela de espera enquanto o banco abre e as fontes carregam. */
-function Carregando() {
-  return (
-    <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: '#15181B' }}>
-      <ActivityIndicator color="#F2C230" />
-    </View>
   );
 }
 
@@ -58,7 +46,7 @@ function Navegacao() {
           headerStyle: { backgroundColor: cores.fundo },
           headerShadowVisible: false,
           headerTintColor: cores.primaria,
-          headerTitleStyle: { color: cores.texto, fontFamily: FONTES.textoForte },
+          headerTitleStyle: { color: cores.texto },
           contentStyle: { backgroundColor: cores.fundo },
         }}
       >

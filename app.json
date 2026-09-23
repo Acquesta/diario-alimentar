@@ -37,8 +37,7 @@
           }
         }
       ],
-      "expo-sqlite",
-      "expo-font"
+      "expo-sqlite"
     ],
     "scheme": "diarioalimentar",
     "experiments": {
