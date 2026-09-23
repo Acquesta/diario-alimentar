@@ -11,6 +11,12 @@ const cors = {
 
 /** Quantas fotos cada pessoa pode mandar por dia. */
 const TETO_DIARIO = 20;
+/**
+ * Teto do app inteiro no mes, somando todo mundo. Com cobranca ligada na chave,
+ * o Google avisa o gasto mas nao corta nada, entao quem segura e este numero.
+ * Da para mudar pelo segredo TETO_MENSAL, sem mexer no codigo.
+ */
+const TETO_MENSAL = Number(Deno.env.get("TETO_MENSAL") ?? 2_000);
 /** Tamanho maximo da imagem depois da reducao feita no aparelho. */
 const LIMITE_IMAGEM = 4 * 1024 * 1024;
 /**
@@ -129,6 +135,17 @@ Deno.serve(async (req: Request) => {
   const imagem = corpo.imagem ?? "";
   if (!imagem || imagem.length > LIMITE_IMAGEM) {
     return resposta({ erro: "A foto esta vazia ou grande demais." }, 400);
+  }
+
+  // Teto do mes antes de contar o uso, para o pedido recusado nao gastar cota.
+  if (TETO_MENSAL > 0) {
+    const { data: noMes, error: erroMes } = await admin.rpc("uso_ia_do_mes");
+    if (erroMes) return resposta({ erro: "falha ao contar o uso do mes" }, 500);
+    if (typeof noMes === "number" && noMes >= TETO_MENSAL) {
+      return resposta({
+        erro: "O app chegou ao teto de uso da IA deste mes. A estimativa por foto volta no dia 1.",
+      }, 429);
+    }
   }
 
   const { data: usado, error: erroUso } = await admin.rpc("registrar_uso_ia", {

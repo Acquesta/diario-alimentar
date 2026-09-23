@@ -22,6 +22,7 @@ fora do servidor.
 | `GEMINI_API_KEY` | Chave do Gemini, de https://aistudio.google.com/apikey |
 | `GEMINI_MODELOS` | Opcional. Lista de modelos separados por vírgula, na ordem de preferência. Padrão: `gemini-3.5-flash-lite,gemini-3.8-flash,gemini-3.6-flash` |
 | `GEMINI_MODELO` | Nome antigo, com um modelo só. Ainda funciona, mas `GEMINI_MODELOS` vem antes |
+| `TETO_MENSAL` | Opcional. Quantas fotos o app inteiro aceita por mês, somando todo mundo. Padrão: 2000. `0` desliga o teto |
 
 `SUPABASE_URL` e `SUPABASE_SERVICE_ROLE_KEY` já vêm prontos no ambiente das funções.
 
@@ -38,9 +39,17 @@ Ao mudar uma função, mude aqui e publique; o que vale é a versão publicada.
 
 ## Teto de uso
 
-`estimar-foto` conta as chamadas na tabela `usos_ia` e recusa acima de 20 por
-pessoa por dia. Quem conta é a função `registrar_uso_ia`, no banco, que desfaz a
-contagem quando recusa, para o pedido recusado não gastar cota.
+São dois tetos, os dois contados na tabela `usos_ia`:
+
+- **Por pessoa:** 20 fotos por dia. Quem conta é a função `registrar_uso_ia`, no
+  banco, que desfaz a contagem quando recusa, para o pedido recusado não gastar cota.
+- **Do app inteiro:** `TETO_MENSAL` fotos por mês, somando todo mundo, conferido
+  pela função `uso_ia_do_mes` antes de contar o uso da pessoa.
+
+O teto mensal existe por causa da cobrança. Com a chave no plano pago, o Google
+manda alerta de gasto mas não corta o serviço, então o corte tem que ser aqui.
+Vale escolher o número abaixo do que se quer gastar, com folga: no
+`gemini-3.5-flash-lite` cada foto custa perto de US$ 0,001.
 
 ## Quando a IA não responde
 
