@@ -15,11 +15,9 @@ export default function AbasLayout() {
   return (
     <Tabs
       screenOptions={{
-        headerStyle: { backgroundColor: cores.fundo },
-        headerShadowVisible: false,
-        headerTintColor: cores.primaria,
-        headerTitleStyle: { color: cores.texto },
-        sceneStyle: { backgroundColor: cores.fundo },
+        // Sem cabeçalho nas abas: o nome da tela já está na barra de baixo.
+        headerShown: false,
+        sceneStyle: { backgroundColor: cores.fundo, paddingTop: margens.top },
         tabBarActiveTintColor: cores.primaria,
         tabBarInactiveTintColor: cores.suave,
         // A barra fica translúcida e o conteúdo passa por baixo dela ao rolar.
@@ -33,7 +31,7 @@ export default function AbasLayout() {
           paddingBottom: margens.bottom + 8,
         },
         // flexShrink: 0 impede o texto de ser espremido e cortar a cauda do "ç".
-        tabBarLabelStyle: { fontSize: 11, lineHeight: 16, marginTop: 2, flexShrink: 0 },
+        tabBarLabelStyle: { fontSize: 11, lineHeight: 16, marginTop: 2, flexShrink: 0, fontFamily: 'Manrope_500Medium' },
         tabBarIconStyle: { flexShrink: 0 },
         tabBarBackground: () => (
           <BlurView
@@ -48,7 +46,6 @@ export default function AbasLayout() {
         name="index"
         options={{
           title: 'Alimentação',
-          headerTitle: 'Diário Alimentar',
           tabBarIcon: ({ color, size }) => <Ionicons name="restaurant-outline" color={color} size={size} />,
         }}
       />
@@ -70,7 +67,6 @@ export default function AbasLayout() {
         name="perfil"
         options={{
           title: 'Perfil',
-          headerTitle: 'Meu perfil e meta',
           tabBarIcon: ({ color, size }) => <Ionicons name="person-outline" color={color} size={size} />,
         }}
       />

@@ -132,8 +132,7 @@ export default function TelaCodigoBarras() {
             colaborativa.
           </Text>
           <Text style={estilos.suave}>
-            O iPhone pergunta a permissão da câmera toda vez que o app é aberto. Se der errado, dá para digitar o
-            código ou os valores do rótulo.
+            O iPhone pede permissão da câmera a cada vez. Se falhar, dá para digitar o código ou os valores do rótulo.
           </Text>
           <Botao titulo="Abrir câmera" onPress={comecar} />
         </Cartao>
@@ -182,8 +181,8 @@ export default function TelaCodigoBarras() {
             {formatar(estado.produto.carboidrato)} · G {formatar(estado.produto.gordura)}
           </Text>
           <Text style={estilos.suave}>
-            Confira com o rótulo. A base é colaborativa e pode ter valor errado. Ao usar, o produto fica salvo em "Meus
-            alimentos" e funciona offline depois.
+            Confira com o rótulo, porque a base é aberta e às vezes tem valor errado. Ao usar, o produto entra em
+            "Meus alimentos" e passa a funcionar sem internet.
           </Text>
           <Botao
             titulo="Usar este produto"

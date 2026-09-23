@@ -85,7 +85,7 @@ export default function Diario() {
           <Cartao>
             <Text style={estilos.titulo}>Defina sua meta</Text>
             <Text style={estilos.suave}>
-              Preencha peso, altura, idade e objetivo na aba Perfil para o app calcular sua meta diária.
+              Preencha peso, altura, idade e objetivo no Perfil. Com isso o app calcula sua meta do dia.
             </Text>
             <Botao titulo="Ir para o Perfil" tipo="secundario" onPress={() => router.push('/perfil')} />
           </Cartao>
@@ -183,7 +183,7 @@ function Resumo({
       </View>
       {kcalExercicio > 0 && metaBase !== null ? (
         <Text style={estilos.suave}>
-          Meta de hoje: base {metaBase} + exercício {kcalExercicio} = {meta.kcal} kcal
+          Meta de hoje: {metaBase} da base mais {kcalExercicio} do treino
         </Text>
       ) : null}
       <Barra rotulo="Calorias" valor={total.kcal} meta={meta.kcal} cor={cores.primaria} unidade="kcal" />

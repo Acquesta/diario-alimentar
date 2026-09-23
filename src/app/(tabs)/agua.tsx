@@ -110,7 +110,7 @@ export default function TelaAgua() {
           {meta ? <Barra rotulo="Água" valor={total} meta={meta} cor={cores.proteina} unidade="ml" /> : null}
           {!meta ? (
             <Text style={estilos.suave}>
-              Preencha seu peso na aba Perfil para o app calcular a meta de água, ou defina a meta aqui.
+              Preencha seu peso no Perfil para o app calcular a meta, ou defina a meta aqui.
             </Text>
           ) : null}
         </Cartao>
@@ -222,8 +222,8 @@ export default function TelaAgua() {
                 {metaSalva !== null
                   ? 'Meta definida por você.'
                   : pesoKg
-                    ? `Calculada pelo seu peso: 35 ml por kg. É uma estimativa; sede, calor e exercício mudam a necessidade.`
-                    : 'Sem peso no perfil, defina a meta aqui.'}
+                    ? `Calculada pelo seu peso, 35 ml por kg. É uma estimativa: calor, sede e treino mudam o quanto você precisa.`
+                    : 'Sem o peso no perfil, defina a meta aqui.'}
               </Text>
               <Chip
                 texto={meta ? `Trocar meta (${litros(meta)})` : 'Definir meta'}
