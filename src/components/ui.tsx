@@ -38,6 +38,14 @@ const escuro: Cores = {
   excesso: '#F08A6E',
 };
 
+/** Manrope em tudo: os pesos fazem a hierarquia, sem trocar de família. */
+const FONTE = {
+  normal: 'Manrope_400Regular',
+  medio: 'Manrope_500Medium',
+  forte: 'Manrope_600SemiBold',
+  numero: 'Manrope_700Bold',
+};
+
 export type PreferenciaTema = 'sistema' | 'claro' | 'escuro';
 
 type Tema = {
@@ -138,11 +146,11 @@ export function AvisoDesfazer({ texto, onDesfazer }: { texto: string; onDesfazer
       accessibilityLiveRegion="polite"
       style={[estilos.aviso, { backgroundColor: cores.texto + 'E0' }]}
     >
-      <Text style={{ flex: 1, color: cores.fundo, fontSize: 15 }} numberOfLines={1}>
+      <Text style={{ flex: 1, color: cores.fundo, fontSize: 15, fontFamily: FONTE.normal }} numberOfLines={1}>
         {texto}
       </Text>
       <Pressable accessibilityRole="button" accessibilityLabel="Desfazer remoção" hitSlop={8} onPress={onDesfazer}>
-        <Text style={{ color: cores.fundo, fontWeight: '700', textDecorationLine: 'underline' }}>Desfazer</Text>
+        <Text style={{ color: cores.fundo, fontFamily: FONTE.forte, textDecorationLine: 'underline' }}>Desfazer</Text>
       </Pressable>
     </BlurView>
   );
@@ -217,20 +225,20 @@ function criarEstilos(cores: Cores) {
       borderWidth: StyleSheet.hairlineWidth,
       borderColor: cores.borda,
     },
-    titulo: { fontSize: 17, fontWeight: '600', color: cores.texto },
+    titulo: { fontSize: 17, fontFamily: FONTE.forte, color: cores.texto },
     /** Números grandes (kcal) com largura fixa, para não "pular" quando mudam. */
-    numero: { fontSize: 44, lineHeight: 48, fontWeight: '700', letterSpacing: -0.5, color: cores.texto, fontVariant: ['tabular-nums'] },
+    numero: { fontSize: 44, lineHeight: 50, fontFamily: FONTE.numero, letterSpacing: -0.8, color: cores.texto, fontVariant: ['tabular-nums'] },
     /** Número de apoio, menor que o principal mas maior que o texto. */
-    numeroMedio: { fontSize: 22, fontWeight: '700', color: cores.texto, fontVariant: ['tabular-nums'] },
-    texto: { fontSize: 15, color: cores.texto },
-    suave: { fontSize: 13, color: cores.suave },
+    numeroMedio: { fontSize: 22, lineHeight: 28, fontFamily: FONTE.numero, color: cores.texto, fontVariant: ['tabular-nums'] },
+    texto: { fontSize: 15, lineHeight: 21, fontFamily: FONTE.normal, color: cores.texto },
+    suave: { fontSize: 13, lineHeight: 18, fontFamily: FONTE.normal, color: cores.suave },
     linhaEntre: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: 8 },
     botao: { paddingVertical: 12, paddingHorizontal: 16, borderRadius: 10, borderCurve: 'continuous', alignItems: 'center' },
     botaoPrimario: { backgroundColor: cores.primaria },
     botaoSecundario: { backgroundColor: cores.primariaSuave },
     /** Ação repetida dentro de um cartão: contorno, para não competir com os dados. */
     botaoContorno: { backgroundColor: 'transparent', borderWidth: 1, borderColor: cores.borda },
-    botaoTexto: { fontSize: 15, fontWeight: '600' },
+    botaoTexto: { fontSize: 15, fontFamily: FONTE.forte },
     chip: {
       paddingVertical: 8,
       paddingHorizontal: 12,
@@ -240,7 +248,7 @@ function criarEstilos(cores: Cores) {
       borderColor: cores.borda,
     },
     chipAtivo: { backgroundColor: cores.primaria, borderColor: cores.primaria },
-    chipTexto: { fontSize: 14, color: cores.texto },
+    chipTexto: { fontSize: 14, fontFamily: FONTE.medio, color: cores.texto },
     input: {
       backgroundColor: cores.cartao,
       borderWidth: 1,
@@ -250,6 +258,7 @@ function criarEstilos(cores: Cores) {
       paddingHorizontal: 12,
       paddingVertical: 10,
       fontSize: 16,
+      fontFamily: FONTE.normal,
       color: cores.texto,
     },
     aviso: {
@@ -266,8 +275,8 @@ function criarEstilos(cores: Cores) {
       borderCurve: 'continuous',
       overflow: 'hidden',
     },
-    rotuloBarra: { fontSize: 13, color: cores.suave },
-    valorBarra: { fontSize: 13, color: cores.texto, fontVariant: ['tabular-nums'] },
+    rotuloBarra: { fontSize: 13, fontFamily: FONTE.normal, color: cores.suave },
+    valorBarra: { fontSize: 13, fontFamily: FONTE.medio, color: cores.texto, fontVariant: ['tabular-nums'] },
     trilho: { height: 8, borderRadius: 4, backgroundColor: cores.borda, overflow: 'hidden' },
     preenchido: { height: 8, borderRadius: 4 },
   });

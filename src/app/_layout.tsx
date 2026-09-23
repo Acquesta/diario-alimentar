@@ -1,6 +1,7 @@
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { ActivityIndicator, Platform, View } from 'react-native';
+import { Manrope_400Regular, Manrope_500Medium, Manrope_600SemiBold, Manrope_700Bold, useFonts } from '@expo-google-fonts/manrope';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { TemaProvider, useTema } from '@/components/ui';
 import { BancoProvider } from '@/lib/banco';
@@ -12,22 +13,30 @@ if (Platform.OS === 'web' && typeof navigator !== 'undefined') {
 }
 
 export default function Layout() {
+  const [fontesProntas] = useFonts({
+    Manrope_400Regular,
+    Manrope_500Medium,
+    Manrope_600SemiBold,
+    Manrope_700Bold,
+  });
+
   return (
     <SafeAreaProvider>
-      <BancoProvider
-      carregando={
-        <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
-          <ActivityIndicator color="#2F7D5B" />
-        </View>
-      }
-    >
-      <TemaProvider>
-        <ContaProvider>
-          <Navegacao />
-        </ContaProvider>
-      </TemaProvider>
+      <BancoProvider carregando={<Espera />}>
+        <TemaProvider>
+          <ContaProvider>{fontesProntas ? <Navegacao /> : <Espera />}</ContaProvider>
+        </TemaProvider>
       </BancoProvider>
     </SafeAreaProvider>
+  );
+}
+
+/** Tela de espera enquanto o banco abre e as fontes carregam. */
+function Espera() {
+  return (
+    <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
+      <ActivityIndicator color="#2F7D5B" />
+    </View>
   );
 }
 
@@ -49,7 +58,7 @@ function Navegacao() {
           headerStyle: { backgroundColor: cores.fundo },
           headerShadowVisible: false,
           headerTintColor: cores.primaria,
-          headerTitleStyle: { color: cores.texto },
+          headerTitleStyle: { color: cores.texto, fontFamily: 'Manrope_600SemiBold' },
           contentStyle: { backgroundColor: cores.fundo },
         }}
       >
