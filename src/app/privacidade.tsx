@@ -36,8 +36,10 @@ export default function TelaPrivacidade() {
       <Cartao>
         <Text style={estilos.titulo}>Créditos</Text>
         <Text style={estilos.texto}>
-          Tabela de alimentos: TACO, Tabela Brasileira de Composição de Alimentos (NEPA/UNICAMP). Banco de dados na web:
-          sql.js. Código sob a licença MIT.
+          Tabelas de alimentos: TACO, Tabela Brasileira de Composição de Alimentos (NEPA/UNICAMP), e IBGE, Pesquisa
+          de Orçamentos Familiares 2008-2009, Tabela de Composição Nutricional dos Alimentos Consumidos no Brasil.
+          Produtos de marca: Open Food Facts. Banco de dados na web: sql.js. Ícone do braço: Material Design Icons.
+          Código sob a licença MIT.
         </Text>
       </Cartao>
     </ScrollView>
