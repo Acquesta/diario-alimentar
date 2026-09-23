@@ -1,6 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
 import { Tabs } from 'expo-router';
-import { useTema } from '@/components/ui';
+import { FONTES, useTema } from '@/components/ui';
 
 /** As quatro áreas do app. O que abre de dentro delas fica na pilha de cima. */
 export default function AbasLayout() {
@@ -11,11 +11,12 @@ export default function AbasLayout() {
         headerStyle: { backgroundColor: cores.fundo },
         headerShadowVisible: false,
         headerTintColor: cores.primaria,
-        headerTitleStyle: { color: cores.texto },
+        headerTitleStyle: { color: cores.texto, fontFamily: FONTES.textoForte },
         sceneStyle: { backgroundColor: cores.fundo },
         tabBarActiveTintColor: cores.primaria,
         tabBarInactiveTintColor: cores.suave,
         tabBarStyle: { backgroundColor: cores.cartao, borderTopColor: cores.borda },
+        tabBarLabelStyle: { fontFamily: FONTES.textoMedio, fontSize: 11 },
       }}
     >
       <Tabs.Screen

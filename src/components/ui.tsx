@@ -3,38 +3,55 @@ import { createContext, useContext, useEffect, useMemo, useState, type ReactNode
 import { Pressable, StyleSheet, Text, useColorScheme, View, type StyleProp, type ViewStyle } from 'react-native';
 import { lerConfig, salvarConfig } from '@/lib/db';
 
+/**
+ * Direção visual "Ferro": vocabulário de academia — grafite, aço e o amarelo
+ * das anilhas. O amarelo aparece só na barra de calorias e nos números que
+ * importam; o resto fica cinza e quieto, para o olho cair sempre no mesmo lugar.
+ */
 const claro = {
-  fundo: '#F6F7F4',
+  fundo: '#EDEFF1',
   cartao: '#FFFFFF',
-  texto: '#1D2320',
-  suave: '#66706B',
-  borda: '#E3E6E1',
-  primaria: '#2F7D5B',
-  sobrePrimaria: '#FFFFFF',
-  primariaSuave: '#E3F1EA',
-  perigo: '#B3261E',
-  proteina: '#3D6FD9',
-  carboidrato: '#D98A1F',
-  gordura: '#A34FC2',
-  excesso: '#C9472B',
+  texto: '#15181B',
+  suave: '#5B656D',
+  borda: '#D6DCE1',
+  primaria: '#15181B',
+  sobrePrimaria: '#F7F9FA',
+  primariaSuave: '#DEE3E8',
+  acento: '#F2C230',
+  sobreAcento: '#15181B',
+  perigo: '#B84A39',
+  proteina: '#6B7780',
+  carboidrato: '#8A949C',
+  gordura: '#A8B1B8',
+  excesso: '#B84A39',
 };
 
 export type Cores = typeof claro;
 
 const escuro: Cores = {
-  fundo: '#0F1412',
-  cartao: '#1A211E',
-  texto: '#E8ECEA',
-  suave: '#9AA5A0',
-  borda: '#2A332F',
-  primaria: '#5CC08F',
-  sobrePrimaria: '#0F1412',
-  primariaSuave: '#1F3A2E',
-  perigo: '#F2B8B5',
-  proteina: '#7FA3F0',
-  carboidrato: '#F0B35A',
-  gordura: '#CB8BE0',
-  excesso: '#F08A6E',
+  fundo: '#15181B',
+  cartao: '#1F2429',
+  texto: '#E8EBEE',
+  suave: '#8A949C',
+  borda: '#2C333A',
+  primaria: '#E8EBEE',
+  sobrePrimaria: '#15181B',
+  primariaSuave: '#272E35',
+  acento: '#F2C230',
+  sobreAcento: '#15181B',
+  perigo: '#E0735F',
+  proteina: '#AAB4BC',
+  carboidrato: '#828C94',
+  gordura: '#5F6970',
+  excesso: '#E0735F',
+};
+
+/** Números e títulos em Archivo Narrow; o resto em Public Sans. */
+export const FONTES = {
+  display: 'ArchivoNarrow_700Bold',
+  texto: 'PublicSans_400Regular',
+  textoMedio: 'PublicSans_500Medium',
+  textoForte: 'PublicSans_600SemiBold',
 };
 
 export type PreferenciaTema = 'sistema' | 'claro' | 'escuro';
@@ -161,7 +178,7 @@ export function Barra({
       <View style={estilos.linhaEntre}>
         <Text style={estilos.rotuloBarra}>{rotulo}</Text>
         <Text style={[estilos.valorBarra, passou && { color: cores.excesso }]}>
-          {formatar(valor)} / {formatar(meta)} {unidade}
+          {numeroDaBarra(valor)} / {numeroDaBarra(meta)} {unidade}
         </Text>
       </View>
       <View style={estilos.trilho}>
@@ -171,18 +188,30 @@ export function Barra({
   );
 }
 
-// Criado uma vez só: Intl.NumberFormat é caro de instanciar.
+// Criados uma vez só: Intl.NumberFormat é caro de instanciar.
 const NUMERO = new Intl.NumberFormat('pt-BR', { maximumFractionDigits: 1, useGrouping: false });
+const NUMERO_GRANDE = new Intl.NumberFormat('pt-BR', { maximumFractionDigits: 0 });
 
 /** Número no formato brasileiro, com no máximo uma casa decimal (ex.: 42,2). */
 export function formatar(n: number): string {
   return NUMERO.format(n);
 }
 
+/** Números grandes com separador de milhar (ex.: 2.292), para leitura rápida. */
+export function formatarGrande(n: number): string {
+  return NUMERO_GRANDE.format(n);
+}
+
+/** Acima de mil, separador de milhar; abaixo, uma casa decimal. */
+function numeroDaBarra(n: number): string {
+  return n >= 1000 ? formatarGrande(n) : formatar(n);
+}
+
 function criarEstilos(cores: Cores) {
   return StyleSheet.create({
     tela: { flex: 1, backgroundColor: cores.fundo },
     conteudo: { padding: 16, gap: 12, paddingBottom: 48, maxWidth: 560, width: '100%', alignSelf: 'center' },
+    /** Bloco comum de conteúdo. Raio maior que o do painel, para ficar abaixo dele na hierarquia. */
     cartao: {
       backgroundColor: cores.cartao,
       borderRadius: 14,
@@ -192,16 +221,30 @@ function criarEstilos(cores: Cores) {
       borderWidth: StyleSheet.hairlineWidth,
       borderColor: cores.borda,
     },
-    titulo: { fontSize: 17, fontWeight: '600', color: cores.texto },
-    /** Números grandes (kcal) com largura fixa, para não "pular" quando mudam. */
-    numero: { fontSize: 32, fontWeight: '600', color: cores.texto, fontVariant: ['tabular-nums'] },
-    texto: { fontSize: 15, color: cores.texto },
-    suave: { fontSize: 13, color: cores.suave },
+    /** O bloco principal da tela: chapa de aço, cantos quase retos, sem borda. */
+    painel: { backgroundColor: cores.cartao, borderRadius: 6, padding: 20, gap: 14 },
+    titulo: { fontSize: 18, fontFamily: FONTES.textoForte, color: cores.texto },
+    /** Número que manda na tela. Condensado, apertado e com dígitos de largura fixa. */
+    numeroGrande: {
+      fontSize: 68,
+      lineHeight: 72,
+      fontFamily: FONTES.display,
+      color: cores.texto,
+      letterSpacing: -1,
+      fontVariant: ['tabular-nums'],
+    },
+    numero: { fontSize: 40, lineHeight: 44, fontFamily: FONTES.display, color: cores.texto, fontVariant: ['tabular-nums'] },
+    texto: { fontSize: 15, lineHeight: 21, fontFamily: FONTES.texto, color: cores.texto },
+    suave: { fontSize: 13, lineHeight: 18, fontFamily: FONTES.texto, color: cores.suave },
     linhaEntre: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: 8 },
-    botao: { paddingVertical: 12, paddingHorizontal: 16, borderRadius: 10, borderCurve: 'continuous', alignItems: 'center' },
+    botao: { paddingVertical: 13, paddingHorizontal: 16, borderRadius: 8, borderCurve: 'continuous', alignItems: 'center' },
     botaoPrimario: { backgroundColor: cores.primaria },
-    botaoSecundario: { backgroundColor: cores.primariaSuave },
-    botaoTexto: { fontSize: 15, fontWeight: '600' },
+    botaoSecundario: {
+      backgroundColor: 'transparent',
+      borderWidth: StyleSheet.hairlineWidth,
+      borderColor: cores.borda,
+    },
+    botaoTexto: { fontSize: 15, fontFamily: FONTES.textoForte },
     chip: {
       paddingVertical: 8,
       paddingHorizontal: 12,
@@ -211,21 +254,23 @@ function criarEstilos(cores: Cores) {
       borderColor: cores.borda,
     },
     chipAtivo: { backgroundColor: cores.primaria, borderColor: cores.primaria },
-    chipTexto: { fontSize: 14, color: cores.texto },
+    chipTexto: { fontSize: 14, fontFamily: FONTES.textoMedio, color: cores.texto },
     input: {
       backgroundColor: cores.cartao,
       borderWidth: 1,
       borderColor: cores.borda,
-      borderRadius: 10,
+      borderRadius: 8,
       borderCurve: 'continuous',
       paddingHorizontal: 12,
-      paddingVertical: 10,
+      paddingVertical: 11,
       fontSize: 16,
+      fontFamily: FONTES.texto,
       color: cores.texto,
     },
-    rotuloBarra: { fontSize: 13, color: cores.suave },
-    valorBarra: { fontSize: 13, color: cores.texto, fontVariant: ['tabular-nums'] },
-    trilho: { height: 8, borderRadius: 4, backgroundColor: cores.borda, overflow: 'hidden' },
-    preenchido: { height: 8, borderRadius: 4 },
+    rotuloBarra: { fontSize: 13, fontFamily: FONTES.texto, color: cores.suave },
+    valorBarra: { fontSize: 13, fontFamily: FONTES.textoMedio, color: cores.texto, fontVariant: ['tabular-nums'] },
+    trilho: { height: 6, borderRadius: 3, backgroundColor: cores.borda, overflow: 'hidden' },
+    preenchido: { height: 6, borderRadius: 3 },
   });
 }
+

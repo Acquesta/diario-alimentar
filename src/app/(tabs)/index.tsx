@@ -1,8 +1,8 @@
 import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { useAoAlterar, useBanco } from '@/lib/banco';
 import { useCallback, useEffect, useState } from 'react';
-import { Pressable, ScrollView, Text, View } from 'react-native';
-import { Barra, Botao, Cartao, formatar, useTema } from '@/components/ui';
+import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Barra, Botao, Cartao, formatar, formatarGrande, useTema } from '@/components/ui';
 import { hoje, rotulo, somarDias } from '@/lib/dates';
 import {
   lerPerfil,
@@ -180,41 +180,48 @@ function Resumo({
   const { cores, estilos } = useTema();
   if (!meta) {
     return (
-      <Cartao>
-        <Text style={estilos.numero}>{total.kcal} kcal</Text>
-        <Text style={estilos.suave}>
-          Proteína {formatar(total.proteina)} g · Carboidrato {formatar(total.carboidrato)} g · Gordura{' '}
-          {formatar(total.gordura)} g
-        </Text>
-      </Cartao>
+      <View style={estilos.painel}>
+        <Text style={estilos.numeroGrande}>{formatarGrande(total.kcal)}</Text>
+        <Text style={estilos.suave}>kcal hoje, sem meta definida</Text>
+      </View>
     );
   }
 
   const restante = meta.kcal - total.kcal;
+  const passou = restante < 0;
   return (
-    <Cartao>
+    <View style={estilos.painel}>
       <View style={estilos.linhaEntre}>
-        <View>
-          <Text style={estilos.numero}>{total.kcal}</Text>
-          <Text style={estilos.suave}>de {meta.kcal} kcal</Text>
+        <View style={{ flex: 1, minWidth: 0 }}>
+          <Text style={[estilos.numeroGrande, passou && { color: cores.excesso }]}>
+            {formatarGrande(Math.abs(restante))}
+          </Text>
+          <Text style={estilos.suave}>
+            {passou
+              ? `kcal acima da meta de ${formatarGrande(meta.kcal)}`
+              : `kcal para comer hoje, de ${formatarGrande(meta.kcal)}`}
+          </Text>
         </View>
         <View style={{ alignItems: 'flex-end' }}>
-          <Text style={[estilos.titulo, { color: restante < 0 ? cores.excesso : cores.primaria, fontVariant: ['tabular-nums'] }]}>
-            {Math.abs(restante)} kcal
-          </Text>
-          <Text style={estilos.suave}>{restante < 0 ? 'acima da meta' : 'restantes'}</Text>
+          <Text style={estilos.numero}>{formatarGrande(total.kcal)}</Text>
+          <Text style={estilos.suave}>já comidas</Text>
         </View>
       </View>
+
+      <Barra rotulo="Calorias" valor={total.kcal} meta={meta.kcal} cor={cores.acento} unidade="kcal" />
+
       {kcalExercicio > 0 && metaBase !== null ? (
         <Text style={estilos.suave}>
-          Meta de hoje: base {metaBase} + exercício {kcalExercicio} = {meta.kcal} kcal
+          Meta de hoje: {formatarGrande(metaBase)} da base mais {formatarGrande(kcalExercicio)} do treino
         </Text>
       ) : null}
-      <Barra rotulo="Calorias" valor={total.kcal} meta={meta.kcal} cor={cores.primaria} unidade="kcal" />
-      <Barra rotulo="Proteína" valor={total.proteina} meta={meta.proteina} cor={cores.proteina} />
-      <Barra rotulo="Carboidrato" valor={total.carboidrato} meta={meta.carboidrato} cor={cores.carboidrato} />
-      <Barra rotulo="Gordura" valor={total.gordura} meta={meta.gordura} cor={cores.gordura} />
-    </Cartao>
+
+      <View style={{ gap: 8, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: cores.borda, paddingTop: 12 }}>
+        <Barra rotulo="Proteína" valor={total.proteina} meta={meta.proteina} cor={cores.proteina} />
+        <Barra rotulo="Carboidrato" valor={total.carboidrato} meta={meta.carboidrato} cor={cores.carboidrato} />
+        <Barra rotulo="Gordura" valor={total.gordura} meta={meta.gordura} cor={cores.gordura} />
+      </View>
+    </View>
   );
 }
 
@@ -246,12 +253,14 @@ function SecaoRefeicao({
 
       {itens.map((i) => (
         <View key={i.id} style={[estilos.linhaEntre, { alignItems: 'flex-start' }]}>
-          <View style={{ flex: 1, minWidth: 0 }}>
+          <View style={{ flex: 1, minWidth: 0, gap: 2 }}>
             <Text style={estilos.texto}>{i.nome}</Text>
-            <Text style={estilos.suave}>
-              {formatar(i.gramas)} g · {Math.round(i.kcal)} kcal · P {formatar(i.proteina)} · C {formatar(i.carboidrato)} · G{' '}
-              {formatar(i.gordura)}
-            </Text>
+            <View style={{ flexDirection: 'row', gap: 12, flexWrap: 'wrap' }}>
+              <Text style={estilos.suave}>{formatar(i.gramas)} g</Text>
+              <Text style={estilos.suave}>P {formatar(i.proteina)}</Text>
+              <Text style={estilos.suave}>C {formatar(i.carboidrato)}</Text>
+              <Text style={estilos.suave}>G {formatar(i.gordura)}</Text>
+            </View>
           </View>
           <Pressable
             onPress={() => onRemover(i)}
