@@ -3,7 +3,7 @@ import * as ImageManipulator from 'expo-image-manipulator';
 import * as ImagePicker from 'expo-image-picker';
 import { useState } from 'react';
 import { ActivityIndicator, Image, Platform, Pressable, ScrollView, Text, TextInput, View } from 'react-native';
-import { Botao, Cartao, formatar, useTema } from '@/components/ui';
+import { Ajuda, Botao, Cartao, formatar, useTema } from '@/components/ui';
 import { useBanco } from '@/lib/banco';
 import { useConta } from '@/lib/conta';
 import { criarPersonalizado, registrar } from '@/lib/db';
@@ -138,13 +138,17 @@ export default function TelaEstimarFoto() {
     >
       {!itens && (
         <Cartao>
-          <Text style={estilos.titulo}>Foto do prato</Text>
-          <Text style={estilos.texto}>
-            A IA olha a foto e estima o que tem no prato e quanto. Você confere e corrige tudo antes de registrar.
-          </Text>
-          <Text style={estilos.suave}>
-            A foto vai para o servidor só para essa estimativa, e não fica guardada. São até 30 fotos por dia.
-          </Text>
+          <Ajuda
+            titulo="Foto do prato"
+            texto={
+              'A IA olha a foto e estima o que tem no prato e quanto. Você confere e corrige tudo antes de ' +
+              'registrar. A foto vai para o servidor só para essa estimativa e não fica guardada em lugar ' +
+              'nenhum. São até 30 fotos por dia.' +
+              (Platform.OS === 'web'
+                ? ' No iPhone, "Tirar foto" abre a câmera e pede permissão a cada vez; se der errado, use uma foto salva.'
+                : '')
+            }
+          />
           <Botao titulo="Tirar foto" desabilitado={pensando} onPress={() => escolher('camera')} />
           <Botao
             titulo="Escolher foto salva"
@@ -237,11 +241,6 @@ export default function TelaEstimarFoto() {
         </>
       ) : null}
 
-      {Platform.OS === 'web' ? (
-        <Text style={estilos.suave}>
-          No iPhone, "Tirar foto" abre a câmera e pede permissão a cada vez. Se der errado, use uma foto salva.
-        </Text>
-      ) : null}
     </ScrollView>
   );
 }

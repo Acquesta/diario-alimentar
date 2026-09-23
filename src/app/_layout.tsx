@@ -72,15 +72,24 @@ function Navegacao() {
               style={[StyleSheet.absoluteFill, { backgroundColor: cores.fundo + 'B3' }]}
             />
           ),
+          // Quem tem cabeçalho desce o conteúdo. Nas abas, que não têm, esse
+          // espaço virava uma faixa vazia no topo, da cor do fundo, comendo tela.
           contentStyle: { backgroundColor: cores.fundo, paddingTop: ALTURA_CABECALHO + margens.top },
         }}
       >
-        <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+        <Stack.Screen
+          name="(tabs)"
+          options={{
+            headerShown: false,
+            contentStyle: { backgroundColor: cores.fundo, paddingTop: margens.top },
+          }}
+        />
         <Stack.Screen name="adicionar" options={{ title: 'Adicionar alimento' }} />
         <Stack.Screen name="novo-alimento" options={{ title: 'Novo alimento' }} />
         <Stack.Screen name="codigo-barras" options={{ title: 'Código de barras' }} />
         <Stack.Screen name="estimar-foto" options={{ title: 'Foto do prato' }} />
         <Stack.Screen name="prato" options={{ title: 'Prato' }} />
+        <Stack.Screen name="treinos-da-semana" options={{ title: 'Meus treinos da semana' }} />
         <Stack.Screen name="privacidade" options={{ title: 'Privacidade' }} />
         <Stack.Screen name="apagar-conta" options={{ title: 'Apagar conta e dados' }} />
       </Stack>

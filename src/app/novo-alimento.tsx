@@ -3,7 +3,7 @@ import { voltar } from '@/lib/navegacao';
 import { useBanco } from '@/lib/banco';
 import { useState } from 'react';
 import { ScrollView, Text, TextInput, View } from 'react-native';
-import { Botao, Cartao, useTema } from '@/components/ui';
+import { Ajuda, Botao, Cartao, useTema } from '@/components/ui';
 import { criarPersonalizado } from '@/lib/db';
 
 /** Cadastro de alimento pelo rótulo nutricional. Valores convertidos para 100 g. */
@@ -30,9 +30,12 @@ export default function NovoAlimento() {
   return (
     <ScrollView style={estilos.tela} contentContainerStyle={estilos.conteudo} keyboardShouldPersistTaps="handled" contentInsetAdjustmentBehavior="automatic">
       <Cartao>
-        <Text style={estilos.suave}>
-          Copie os valores da tabela nutricional da embalagem. Se ela mostra "porção de 200 ml", digite 200 na porção.
-        </Text>
+        <Ajuda
+          texto={
+            'Copie os valores da tabela nutricional da embalagem. Se ela mostra "porção de 200 ml", digite ' +
+            '200 na porção.'
+          }
+        />
         {params.codigo ? <Text style={estilos.suave}>Código de barras {params.codigo}</Text> : null}
         <Rotulo texto="Nome" />
         <TextInput

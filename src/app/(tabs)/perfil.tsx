@@ -2,7 +2,7 @@ import { useFocusEffect } from 'expo-router';
 import { useBanco, useTipoArmazenamento } from '@/lib/banco';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { ScrollView, Text, TextInput, View } from 'react-native';
-import { Cartao, Chip, useTema, type PreferenciaTema } from '@/components/ui';
+import { Ajuda, Cartao, Chip, useTema, type PreferenciaTema } from '@/components/ui';
 import { CartaoConta } from '@/components/conta';
 import { lerPerfil, salvarPeso, salvarPerfil } from '@/lib/db';
 import { metaCalculada, metaDiaria, type Atividade, type Objetivo, type Perfil, type Sexo } from '@/lib/nutrition';
@@ -128,17 +128,19 @@ export default function TelaPerfil() {
       </Cartao>
 
       <Cartao>
-        <Text style={estilos.titulo}>Atividade física</Text>
+        <Ajuda
+          titulo="Atividade física"
+          texto={
+            'Conte aqui só o seu dia a dia, sem os treinos. Eles entram na aba Exercícios e somam na meta. ' +
+            'Marcar um nível alto aqui e ainda registrar treino conta o mesmo esforço duas vezes.'
+          }
+        />
         {ATIVIDADES.map((a) => (
           <View key={a.id} style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
             <Chip texto={a.nome} ativo={atividade === a.id} onPress={() => setAtividade(a.id)} />
             <Text style={[estilos.suave, { flex: 1 }]}>{a.dica}</Text>
           </View>
         ))}
-        <Text style={estilos.suave}>
-          Conte aqui só o seu dia a dia, sem os treinos. Eles entram na aba Exercícios e somam na meta.
-          Marcar um nível alto aqui e ainda registrar treino conta o mesmo esforço duas vezes.
-        </Text>
       </Cartao>
 
       <Cartao>
@@ -151,18 +153,23 @@ export default function TelaPerfil() {
       </Cartao>
 
       <Cartao>
-        <Text style={estilos.titulo}>Meta diária</Text>
+        <Ajuda
+          titulo="Meta diária"
+          texto={
+            'A meta sai da fórmula de Mifflin-St Jeor, com o seu peso, altura, idade e nível de atividade. ' +
+            'É uma estimativa: um nutricionista pode ajustar. Se preferir, escreva a sua própria meta no ' +
+            'campo abaixo, e ela passa a valer no lugar da calculada.'
+          }
+        />
         {meta ? (
           <>
             <Text style={[estilos.numero, { color: cores.primaria }]}>{meta.kcal} kcal</Text>
             <Text style={estilos.suave}>
               Proteína {meta.proteina} g · Carboidrato {meta.carboidrato} g · Gordura {meta.gordura} g
             </Text>
-            <Text style={estilos.suave}>
-              {perfil.metaManual
-                ? `Meta manual. A calculada seria ${metaCalculada(perfil)} kcal.`
-                : 'Calculada pela fórmula de Mifflin-St Jeor com o seu nível de atividade. É uma estimativa, e um nutricionista pode ajustar.'}
-            </Text>
+            {perfil.metaManual ? (
+              <Text style={estilos.suave}>Meta manual. A calculada seria {metaCalculada(perfil)} kcal.</Text>
+            ) : null}
           </>
         ) : (
           <Text style={[estilos.suave, { color: cores.perigo }]}>Confira: {erros.join('; ')}.</Text>
@@ -186,10 +193,12 @@ export default function TelaPerfil() {
             <Chip key={t.id} texto={t.nome} ativo={preferencia === t.id} onPress={() => setPreferencia(t.id)} />
           ))}
         </View>
-        <Text style={estilos.suave}>
-          Seus dados ficam neste aparelho{armazenamento === 'sqlite' ? '' : ', em modo compatível'}.
-        </Text>
-        <Text style={estilos.suave}>Muda na hora. Em "Automático", o app segue o modo claro ou escuro do celular.</Text>
+        <Ajuda
+          texto={
+            'Em "Automático", o app segue o modo claro ou escuro do celular. A troca vale na hora. ' +
+            `Seus dados ficam neste aparelho${armazenamento === 'sqlite' ? '' : ', em modo compatível'}.`
+          }
+        />
       </Cartao>
 
       <CartaoConta />

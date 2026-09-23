@@ -1,7 +1,7 @@
 import { router } from 'expo-router';
 import { useState } from 'react';
 import { ActivityIndicator, Text, TextInput, View } from 'react-native';
-import { Botao, Cartao, useTema } from '@/components/ui';
+import { Ajuda, Botao, Cartao, useTema } from '@/components/ui';
 import { useConta } from '@/lib/conta';
 
 const DATA_HORA = new Intl.DateTimeFormat('pt-BR', { dateStyle: 'short', timeStyle: 'short' });
@@ -28,16 +28,19 @@ export function CartaoConta() {
   return (
     <Cartao>
       <View style={estilos.linhaEntre}>
-        <Text style={estilos.titulo}>Conta e backup</Text>
+        <Ajuda
+          titulo="Conta e backup"
+          texto={
+            'Entrar é opcional. Com a conta, o diário fica copiado na nuvem e volta se você trocar de celular ' +
+            'ou apagar o app. O login é por código no e-mail, sem senha, e o backup sobe sozinho depois de ' +
+            'cada alteração.'
+          }
+        />
         {conta.ocupado && <ActivityIndicator color={cores.primaria} />}
       </View>
 
       {!conta.usuario && !codigoEnviado && (
         <>
-          <Text style={estilos.suave}>
-            Entrar é opcional. Com a conta, o diário fica copiado na nuvem e volta se você trocar de celular ou apagar
-            o app.
-          </Text>
           <TextInput
             style={estilos.input}
             value={email}

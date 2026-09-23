@@ -3,7 +3,7 @@ import { voltar } from '@/lib/navegacao';
 import { useBanco } from '@/lib/banco';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, FlatList, Pressable, Text, TextInput, View } from 'react-native';
-import { Botao, Cartao, Chip, formatar, useTema } from '@/components/ui';
+import { Ajuda, Botao, Cartao, Chip, formatar, useTema } from '@/components/ui';
 import { hoje } from '@/lib/dates';
 import {
   criarPersonalizado,
@@ -267,9 +267,11 @@ function ProdutosDeMarca({
             </Text>
           </Pressable>
         ))}
-        <Text style={estilos.suave}>
-          Confira com o rótulo: a base é aberta e às vezes tem valor errado. O escolhido fica salvo no aparelho.
-        </Text>
+        <Ajuda
+          texto={
+            'Confira com o rótulo: a base é aberta e às vezes tem valor errado. O escolhido fica salvo no aparelho.'
+          }
+        />
       </View>
     );
   }
@@ -306,9 +308,9 @@ function MeusPratos({
         </Pressable>
       </View>
       {pratos.length === 0 ? (
-        <Text style={estilos.suave}>
-          Monte uma vez o que você come sempre (ex.: arroz + feijão + frango) e registre tudo em um toque.
-        </Text>
+        <Ajuda
+          texto={'Monte uma vez o que você come sempre (ex.: arroz + feijão + frango) e registre tudo em um toque.'}
+        />
       ) : null}
       {pratos.map((p) => {
         const total = somar(p.itens.map((i) => porcao(i.alimento, i.gramas)));

@@ -1,7 +1,8 @@
 import { router, useFocusEffect } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
 import { Pressable, ScrollView, Text, TextInput, View } from 'react-native';
-import { AvisoDesfazer, Botao, Cartao, Chip, formatar, useTema } from '@/components/ui';
+import { Ajuda, AvisoDesfazer, Botao, Cartao, Chip, formatar, useTema } from '@/components/ui';
+import { ListaExercicios } from '@/components/lista-exercicios';
 import { useAoAlterar, useBanco } from '@/lib/banco';
 import { diaDaSemana, hoje, nomeDiaDaSemana, rotulo, somarDias } from '@/lib/dates';
 import {
@@ -12,11 +13,9 @@ import {
   registrarExercicio,
   removerExercicio,
   restaurarExercicio,
-  salvarRotina,
   type RegistroExercicio,
 } from '@/lib/db';
 import {
-  buscarExercicios,
   descrever,
   descreverItem,
   FOCOS,
@@ -26,7 +25,6 @@ import {
   medidaDoTipo,
   TIPOS,
   volumeCarga,
-  type ExercicioCatalogo,
   type Foco,
   type Intensidade,
   type ItemTreino,
@@ -125,7 +123,14 @@ export default function TelaExercicios() {
             }}
           />
         ) : (
-          <Botao titulo="Registrar treino" onPress={() => setRegistrando(true)} />
+          <>
+            <Botao
+              titulo="Meus treinos da semana"
+              tipo="contorno"
+              onPress={() => router.push('/treinos-da-semana')}
+            />
+            <Botao titulo="Registrar treino" onPress={() => setRegistrando(true)} />
+          </>
         )}
 
         {registros.length > 0 ? (
@@ -226,13 +231,6 @@ function Formulario({
     setAvisoRotina(`Treino de ${nomeDiaDaSemana(dia)} carregado. Confira antes de salvar.`);
   };
 
-  /** Guarda a lista de agora como o treino daquele dia da semana. */
-  const guardarRotina = async () => {
-    await salvarRotina(db, diaDaData, Number(minutos.replace(',', '.')) || null, itens);
-    await carregarDias();
-    setAvisoRotina(`Este virou o seu treino de ${nomeDoDia}.`);
-  };
-
   const medida = medidaDoTipo(tipo);
   const n = (t: string) => Number(t.replace(',', '.'));
   const comLista = tipo === 'musculacao' && detalhado;
@@ -262,10 +260,13 @@ function Formulario({
 
       {tipo === 'musculacao' ? (
         <>
-          <View style={{ flexDirection: 'row', gap: 6 }}>
-            <Chip texto="Exercício a exercício" ativo={detalhado} onPress={() => setDetalhado(true)} />
-            <Chip texto="Só o tempo" ativo={!detalhado} onPress={() => setDetalhado(false)} />
-          </View>
+          {/* Com exercício na lista o modo já está decidido; os chips saem da frente. */}
+          {itens.length === 0 ? (
+            <View style={{ flexDirection: 'row', gap: 6 }}>
+              <Chip texto="Exercício a exercício" ativo={detalhado} onPress={() => setDetalhado(true)} />
+              <Chip texto="Só o tempo" ativo={!detalhado} onPress={() => setDetalhado(false)} />
+            </View>
+          ) : null}
           {detalhado ? (
             <>
               {diasComRotina.length > 0 ? (
@@ -284,19 +285,11 @@ function Formulario({
                 </>
               ) : null}
 
-              <ListaExercicios itens={itens} onMudar={setItens} />
-
-              {itens.length > 0 ? (
-                <Botao
-                  titulo={
-                    diasComRotina.includes(diaDaData)
-                      ? `Atualizar treino de ${nomeDoDia}`
-                      : `Salvar como treino de ${nomeDoDia}`
-                  }
-                  tipo="secundario"
-                  onPress={guardarRotina}
-                />
-              ) : null}
+              <ListaExercicios
+                itens={itens}
+                onMudar={setItens}
+                vazio="Adicione os exercícios que você fez, ou traga um treino salvo."
+              />
               {avisoRotina ? <Text style={estilos.suave}>{avisoRotina}</Text> : null}
             </>
           ) : (
@@ -373,22 +366,31 @@ function Formulario({
         </>
       ) : null}
 
-      <View style={{ alignItems: 'center', paddingVertical: 8 }}>
+      <View style={{ alignItems: 'center', paddingVertical: 8, gap: 4 }}>
         <Text style={[estilos.titulo, { fontSize: 32 }]}>{kcal} kcal</Text>
-        <Text style={[estilos.suave, { textAlign: 'center' }]}>
-          {faltaExercicio
-            ? 'Adicione os exercícios do treino para o app calcular.'
-            : tipo === 'outro'
-              ? 'Valor informado por você.'
-              : `Gasto a mais do que seu corpo gastaria parado, com ${formatar(pesoKg)} kg.`}
-        </Text>
-        {comLista && itens.length > 0 ? (
+        {faltaExercicio ? (
           <Text style={[estilos.suave, { textAlign: 'center' }]}>
-            Cada série conta pelo exercício que você fez; o resto do tempo conta como descanso.
-            {volume > 0 ? ` Você levantou ${volume.toLocaleString('pt-BR')} kg no total.` : ''}
+            Adicione os exercícios do treino para o app calcular.
+          </Text>
+        ) : comLista && volume > 0 ? (
+          <Text style={[estilos.suave, { textAlign: 'center' }]}>
+            {volume.toLocaleString('pt-BR')} kg levantados
           </Text>
         ) : null}
       </View>
+
+      <Ajuda
+        texto={
+          tipo === 'outro'
+            ? 'O número é o que você informou. O app só soma na meta do dia.'
+            : comLista
+              ? `Cada série conta pelo exercício que você fez e pelo tempo que ela dura; o resto da duração ` +
+                `conta como descanso, que gasta menos mas não volta ao repouso. A conta usa os seus ` +
+                `${formatar(pesoKg)} kg e mostra só o gasto a mais do que ficar parado.`
+              : `A conta usa o MET da atividade e os seus ${formatar(pesoKg)} kg, e mostra só o gasto a mais ` +
+                `do que seu corpo teria parado no mesmo tempo. Esse total soma na sua meta de calorias do dia.`
+        }
+      />
 
       <Botao titulo="Salvar treino" desabilitado={kcal <= 0} onPress={() => onSalvar(treino, kcal)} />
       <Botao titulo="Cancelar" tipo="secundario" onPress={onCancelar} />
@@ -397,129 +399,6 @@ function Formulario({
 }
 
 const maiuscula = (t: string) => t.charAt(0).toUpperCase() + t.slice(1);
-
-/** Lista de exercícios do treino: o que foi feito, com séries, repetições e carga. */
-function ListaExercicios({ itens, onMudar }: { itens: ItemTreino[]; onMudar: (itens: ItemTreino[]) => void }) {
-  const { cores, estilos } = useTema();
-  const [busca, setBusca] = useState('');
-  const [escolhido, setEscolhido] = useState<ExercicioCatalogo | null>(null);
-  const [series, setSeries] = useState('3');
-  const [repeticoes, setRepeticoes] = useState('10');
-  const [carga, setCarga] = useState('');
-
-  const sugestoes = buscarExercicios(busca);
-  const nomeLivre = busca.trim();
-  const nome = escolhido?.nome ?? nomeLivre;
-  const numero = (t: string) => Math.round(Number(t.replace(',', '.')) || 0);
-
-  const adicionar = () => {
-    const s = numero(series);
-    const r = numero(repeticoes);
-    if (!nome || s <= 0 || r <= 0) return;
-    onMudar([
-      ...itens,
-      {
-        catalogo: escolhido?.id ?? null,
-        nome,
-        series: s,
-        repeticoes: r,
-        cargaKg: carga.trim() ? Number(carga.replace(',', '.')) : null,
-      },
-    ]);
-    setBusca('');
-    setEscolhido(null);
-    setCarga('');
-  };
-
-  return (
-    <>
-      {itens.length > 0 ? (
-        <View style={{ gap: 4 }}>
-          {itens.map((i, n) => (
-            <View key={`${i.nome}-${n}`} style={estilos.linhaEntre}>
-              <Text style={[estilos.texto, { flex: 1 }]}>{descreverItem(i)}</Text>
-              <Pressable
-                onPress={() => onMudar(itens.filter((_, j) => j !== n))}
-                accessibilityRole="button"
-                accessibilityLabel={`Tirar ${i.nome} do treino`}
-                hitSlop={8}
-              >
-                <Text style={{ fontSize: 20, color: cores.suave }}>×</Text>
-              </Pressable>
-            </View>
-          ))}
-        </View>
-      ) : (
-        <Text style={estilos.suave}>
-          Registre os exercícios que você fez. Agachamento e supino gastam bem mais que rosca direta, então a lista
-          deixa a conta mais perto da verdade.
-        </Text>
-      )}
-
-      <TextInput
-        style={estilos.input}
-        value={escolhido ? escolhido.nome : busca}
-        onChangeText={(t) => {
-          setEscolhido(null);
-          setBusca(t);
-        }}
-        placeholder="Qual exercício?"
-        placeholderTextColor={cores.suave}
-        accessibilityLabel="Nome do exercício"
-      />
-
-      {!escolhido ? (
-        <View style={{ flexDirection: 'row', gap: 6, flexWrap: 'wrap' }}>
-          {sugestoes.map((e) => (
-            <Chip key={e.id} texto={e.nome} ativo={false} onPress={() => setEscolhido(e)} />
-          ))}
-          {sugestoes.length === 0 && nomeLivre ? (
-            <Text style={estilos.suave}>Não está na lista. Dá para adicionar assim mesmo.</Text>
-          ) : null}
-        </View>
-      ) : null}
-
-      <View style={{ flexDirection: 'row', gap: 8 }}>
-        <View style={{ flex: 1 }}>
-          <Text style={estilos.suave}>Séries</Text>
-          <TextInput
-            style={estilos.input}
-            value={series}
-            onChangeText={setSeries}
-            keyboardType="number-pad"
-            selectTextOnFocus
-            accessibilityLabel="Número de séries"
-          />
-        </View>
-        <View style={{ flex: 1 }}>
-          <Text style={estilos.suave}>Repetições</Text>
-          <TextInput
-            style={estilos.input}
-            value={repeticoes}
-            onChangeText={setRepeticoes}
-            keyboardType="number-pad"
-            selectTextOnFocus
-            accessibilityLabel="Repetições por série"
-          />
-        </View>
-        <View style={{ flex: 1 }}>
-          <Text style={estilos.suave}>Carga (kg)</Text>
-          <TextInput
-            style={estilos.input}
-            value={carga}
-            onChangeText={setCarga}
-            keyboardType="decimal-pad"
-            placeholder="—"
-            placeholderTextColor={cores.suave}
-            accessibilityLabel="Carga em quilos"
-          />
-        </View>
-      </View>
-
-      <Botao titulo="Adicionar exercício" tipo="secundario" desabilitado={!nome} onPress={adicionar} />
-    </>
-  );
-}
 
 function Seta({ texto, rotuloAcessivel, onPress }: { texto: string; rotuloAcessivel: string; onPress: () => void }) {
   const { cores } = useTema();

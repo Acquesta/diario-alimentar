@@ -158,6 +158,38 @@ export function AvisoDesfazer({ texto, onDesfazer }: { texto: string; onDesfazer
   );
 }
 
+/**
+ * Explicação guardada atrás de um "i". O texto longo sai da tela e só aparece
+ * quando a pessoa pede, então sobra espaço para os dados em vez do manual.
+ */
+export function Ajuda({ titulo, texto }: { titulo?: string; texto: string }) {
+  const { cores, estilos } = useTema();
+  const [aberto, setAberto] = useState(false);
+
+  return (
+    <>
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+        {titulo ? <Text style={[estilos.titulo, { flexShrink: 1 }]}>{titulo}</Text> : null}
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={titulo ? `Sobre ${titulo}` : 'Saiba mais'}
+          accessibilityState={{ expanded: aberto }}
+          hitSlop={10}
+          onPress={() => setAberto((a) => !a)}
+          style={({ pressed }) => [estilos.ajudaBotao, (pressed || aberto) && { borderColor: cores.primaria }]}
+        >
+          <Text style={[estilos.ajudaLetra, aberto && { color: cores.primaria }]}>i</Text>
+        </Pressable>
+      </View>
+      {aberto ? (
+        <View style={estilos.ajudaCaixa} accessibilityLiveRegion="polite">
+          <Text style={estilos.suave}>{texto}</Text>
+        </View>
+      ) : null}
+    </>
+  );
+}
+
 export function Chip({ texto, ativo, onPress }: { texto: string; ativo?: boolean; onPress: () => void }) {
   const { cores, estilos } = useTema();
   return (
@@ -235,6 +267,23 @@ function criarEstilos(cores: Cores) {
     texto: { fontSize: 15, lineHeight: 21, fontFamily: FONTE.normal, color: cores.texto },
     suave: { fontSize: 13, lineHeight: 18, fontFamily: FONTE.normal, color: cores.suave },
     linhaEntre: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: 8 },
+    /** Bolinha do "i": pequena, mas com área de toque ampliada por hitSlop. */
+    ajudaBotao: {
+      width: 22,
+      height: 22,
+      borderRadius: 11,
+      borderWidth: 1,
+      borderColor: cores.borda,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    ajudaLetra: { fontSize: 13, lineHeight: 17, fontFamily: FONTE.forte, color: cores.suave },
+    ajudaCaixa: {
+      backgroundColor: cores.primariaSuave,
+      borderRadius: 10,
+      borderCurve: 'continuous',
+      padding: 12,
+    },
     botao: { paddingVertical: 12, paddingHorizontal: 16, borderRadius: 10, borderCurve: 'continuous', alignItems: 'center' },
     botaoPrimario: { backgroundColor: cores.primaria },
     botaoSecundario: { backgroundColor: cores.primariaSuave },

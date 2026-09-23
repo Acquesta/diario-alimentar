@@ -1,7 +1,7 @@
 import { router, useLocalSearchParams } from 'expo-router';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Platform, ScrollView, Text, TextInput, View } from 'react-native';
-import { Botao, Cartao, formatar, useTema } from '@/components/ui';
+import { Ajuda, Botao, Cartao, formatar, useTema } from '@/components/ui';
 import { useBanco } from '@/lib/banco';
 import { criarPersonalizado, personalizadoPorCodigo } from '@/lib/db';
 import { abrirCamera, cameraDisponivel, lerCodigo, mensagemDaCamera, type Camera } from '@/lib/leitor-codigo';
@@ -127,13 +127,13 @@ export default function TelaCodigoBarras() {
       {estado.fase === 'parado' && (
         <Cartao>
           <Text style={estilos.titulo}>Ler código de barras</Text>
-          <Text style={estilos.texto}>
-            Aponte a câmera para o código de barras da embalagem. O produto vem do Open Food Facts, uma base aberta e
-            colaborativa.
-          </Text>
-          <Text style={estilos.suave}>
-            O iPhone pede permissão da câmera a cada vez. Se falhar, dá para digitar o código ou os valores do rótulo.
-          </Text>
+          <Text style={estilos.texto}>Aponte a câmera para o código de barras da embalagem.</Text>
+          <Ajuda
+            texto={
+              'O produto vem do Open Food Facts, uma base aberta e colaborativa. O iPhone pede permissão da ' +
+              'câmera a cada vez; se falhar, dá para digitar o código ou os valores do rótulo.'
+            }
+          />
           <Botao titulo="Abrir câmera" onPress={comecar} />
         </Cartao>
       )}
@@ -180,10 +180,12 @@ export default function TelaCodigoBarras() {
             Por 100 g: {estado.produto.kcal} kcal · P {formatar(estado.produto.proteina)} · C{' '}
             {formatar(estado.produto.carboidrato)} · G {formatar(estado.produto.gordura)}
           </Text>
-          <Text style={estilos.suave}>
-            Confira com o rótulo, porque a base é aberta e às vezes tem valor errado. Ao usar, o produto entra em
-            "Meus alimentos" e passa a funcionar sem internet.
-          </Text>
+          <Ajuda
+            texto={
+              'Confira com o rótulo, porque a base é aberta e às vezes tem valor errado. Ao usar, o produto ' +
+              'entra em "Meus alimentos" e passa a funcionar sem internet.'
+            }
+          />
           <Botao
             titulo="Usar este produto"
             onPress={async () => {
