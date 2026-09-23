@@ -7,12 +7,16 @@ import { agora } from './dates.ts';
 /** Todo acesso ao banco passa por aqui, para facilitar trocar o armazenamento se precisar. */
 
 export const NOME_BANCO = 'diario.db';
-export const VERSAO = 7;
+export const VERSAO = 8;
 
 export async function migrar(db: Banco): Promise<void> {
   const linha = await db.getFirstAsync<{ user_version: number }>('PRAGMA user_version');
   const atual = linha?.user_version ?? 0;
   if (atual >= VERSAO) return;
+
+  // Refazer tabela com chave estrangeira pede a checagem desligada, e o PRAGMA
+  // não vale dentro de transação. Volta a ligar no fim, junto com a versão nova.
+  await db.execAsync('PRAGMA foreign_keys = OFF');
 
   if (atual < 1) {
     await db.execAsync(`
@@ -168,7 +172,108 @@ export async function migrar(db: Banco): Promise<void> {
     `);
   }
 
+  if (atual < 8) {
+    // Arrumo de casa no banco, antes que o app cresça mais:
+    //  - chave estrangeira de verdade em quem é filho de outra tabela, com
+    //    ON DELETE CASCADE, no lugar de apagar pai e filho na mão;
+    //  - peso numa fonte só, dentro do perfil, que passa a aceitar campo vazio;
+    //  - CHECK no que não pode ser zero.
+    // Tabela antiga no SQLite não recebe chave estrangeira: precisa ser refeita.
+    await db.execAsync('DELETE FROM exercicio_itens WHERE exercicio_id NOT IN (SELECT id FROM exercicios)');
+    await db.execAsync('DELETE FROM rotina_itens WHERE dia_semana NOT IN (SELECT dia_semana FROM rotinas)');
+    await db.execAsync('DELETE FROM prato_itens WHERE prato_id NOT IN (SELECT id FROM pratos)');
+
+    await db.withTransactionAsync(async () => {
+      await db.execAsync(`
+        CREATE TABLE exercicio_itens_novo (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          exercicio_id INTEGER NOT NULL REFERENCES exercicios (id) ON DELETE CASCADE,
+          catalogo TEXT,
+          nome TEXT NOT NULL,
+          series INTEGER NOT NULL CHECK (series > 0),
+          repeticoes INTEGER NOT NULL CHECK (repeticoes > 0),
+          carga_kg REAL CHECK (carga_kg IS NULL OR carga_kg >= 0),
+          ordem INTEGER NOT NULL
+        );
+        INSERT INTO exercicio_itens_novo (id, exercicio_id, catalogo, nome, series, repeticoes, carga_kg, ordem)
+          SELECT id, exercicio_id, catalogo, nome, max(series, 1), max(repeticoes, 1),
+                 CASE WHEN carga_kg >= 0 THEN carga_kg END, ordem
+          FROM exercicio_itens;
+        DROP TABLE exercicio_itens;
+        ALTER TABLE exercicio_itens_novo RENAME TO exercicio_itens;
+        CREATE INDEX IF NOT EXISTS idx_exercicio_itens_treino ON exercicio_itens (exercicio_id);
+
+        CREATE TABLE rotina_itens_novo (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          dia_semana INTEGER NOT NULL REFERENCES rotinas (dia_semana) ON DELETE CASCADE,
+          catalogo TEXT,
+          nome TEXT NOT NULL,
+          series INTEGER NOT NULL CHECK (series > 0),
+          repeticoes INTEGER NOT NULL CHECK (repeticoes > 0),
+          carga_kg REAL CHECK (carga_kg IS NULL OR carga_kg >= 0),
+          ordem INTEGER NOT NULL
+        );
+        INSERT INTO rotina_itens_novo (id, dia_semana, catalogo, nome, series, repeticoes, carga_kg, ordem)
+          SELECT id, dia_semana, catalogo, nome, max(series, 1), max(repeticoes, 1),
+                 CASE WHEN carga_kg >= 0 THEN carga_kg END, ordem
+          FROM rotina_itens;
+        DROP TABLE rotina_itens;
+        ALTER TABLE rotina_itens_novo RENAME TO rotina_itens;
+        CREATE INDEX IF NOT EXISTS idx_rotina_itens_dia ON rotina_itens (dia_semana);
+
+        CREATE TABLE prato_itens_novo (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          prato_id INTEGER NOT NULL REFERENCES pratos (id) ON DELETE CASCADE,
+          origem TEXT NOT NULL,
+          alimento_id INTEGER NOT NULL,
+          nome TEXT NOT NULL,
+          gramas REAL NOT NULL CHECK (gramas > 0),
+          kcal REAL NOT NULL,
+          proteina REAL NOT NULL,
+          carboidrato REAL NOT NULL,
+          gordura REAL NOT NULL
+        );
+        INSERT INTO prato_itens_novo (id, prato_id, origem, alimento_id, nome, gramas, kcal, proteina, carboidrato, gordura)
+          SELECT id, prato_id, origem, alimento_id, nome, max(gramas, 0.1), kcal, proteina, carboidrato, gordura
+          FROM prato_itens;
+        DROP TABLE prato_itens;
+        ALTER TABLE prato_itens_novo RENAME TO prato_itens;
+        CREATE INDEX IF NOT EXISTS idx_prato_itens_prato ON prato_itens (prato_id);
+
+        CREATE TABLE perfil_novo (
+          id INTEGER PRIMARY KEY CHECK (id = 1),
+          sexo TEXT,
+          idade INTEGER,
+          altura_cm REAL,
+          peso_kg REAL CHECK (peso_kg IS NULL OR peso_kg > 0),
+          atividade TEXT,
+          objetivo TEXT,
+          meta_manual INTEGER
+        );
+        INSERT INTO perfil_novo (id, sexo, idade, altura_cm, peso_kg, atividade, objetivo, meta_manual)
+          SELECT id, sexo, idade, altura_cm, peso_kg, atividade, objetivo, meta_manual FROM perfil;
+        DROP TABLE perfil;
+        ALTER TABLE perfil_novo RENAME TO perfil;
+      `);
+
+      // O peso morava também em `config`. Fica só no perfil, e a chave sai.
+      const guardado = await db.getFirstAsync<{ valor: string }>(
+        "SELECT valor FROM config WHERE chave = 'peso_kg'",
+      );
+      const peso = Number(guardado?.valor);
+      if (Number.isFinite(peso) && peso > 0) {
+        await db.runAsync(
+          `INSERT INTO perfil (id, peso_kg) VALUES (1, ?)
+           ON CONFLICT (id) DO UPDATE SET peso_kg = excluded.peso_kg`,
+          peso,
+        );
+      }
+      await db.execAsync("DELETE FROM config WHERE chave = 'peso_kg'");
+    });
+  }
+
   await db.execAsync(`PRAGMA user_version = ${VERSAO}`);
+  await db.execAsync('PRAGMA foreign_keys = ON');
 }
 
 // Pratos prontos
@@ -298,40 +403,38 @@ export async function salvarConfig(db: Banco, chave: string, valor: string): Pro
 // Peso
 
 /**
- * O peso fica guardado à parte do perfil completo, em `config`.
- * Água e exercícios só precisam dele, e não faz sentido exigir idade e altura
- * (que só servem para calcular a meta de calorias) para eles funcionarem.
+ * O peso mora no perfil, e só lá. As outras colunas do perfil aceitam vazio,
+ * então água e exercícios funcionam com o peso sozinho, sem exigir idade e
+ * altura, que só servem para calcular a meta de calorias.
  */
-const CHAVE_PESO = 'peso_kg';
-
 export async function salvarPeso(db: Banco, pesoKg: number): Promise<void> {
-  await salvarConfig(db, CHAVE_PESO, String(pesoKg));
+  await db.runAsync(
+    'INSERT INTO perfil (id, peso_kg) VALUES (1, ?) ON CONFLICT (id) DO UPDATE SET peso_kg = excluded.peso_kg',
+    pesoKg,
+  );
 }
 
 export async function lerPeso(db: Banco): Promise<number | null> {
-  const valor = await lerConfig(db, CHAVE_PESO);
-  const n = valor ? Number(valor) : NaN;
-  if (Number.isFinite(n) && n > 0) return n;
-  // Quem já tinha perfil antes desta versão não tem o peso em `config`.
-  const linha = await db.getFirstAsync<{ peso_kg: number }>('SELECT peso_kg FROM perfil WHERE id = 1');
-  return linha?.peso_kg ?? null;
+  const linha = await db.getFirstAsync<{ peso_kg: number | null }>('SELECT peso_kg FROM perfil WHERE id = 1');
+  return linha?.peso_kg && linha.peso_kg > 0 ? linha.peso_kg : null;
 }
 
 // Perfil
 
 type PerfilLinha = {
-  sexo: Perfil['sexo'];
-  idade: number;
-  altura_cm: number;
-  peso_kg: number;
-  atividade: Perfil['atividade'];
-  objetivo: Perfil['objetivo'];
+  sexo: Perfil['sexo'] | null;
+  idade: number | null;
+  altura_cm: number | null;
+  peso_kg: number | null;
+  atividade: Perfil['atividade'] | null;
+  objetivo: Perfil['objetivo'] | null;
   meta_manual: number | null;
 };
 
 export async function lerPerfil(db: Banco): Promise<Perfil | null> {
   const l = await db.getFirstAsync<PerfilLinha>('SELECT * FROM perfil WHERE id = 1');
-  if (!l) return null;
+  // A linha pode existir só com o peso, gravado pela aba Água ou Exercícios.
+  if (!l || !l.sexo || !l.idade || !l.altura_cm || !l.peso_kg || !l.atividade || !l.objetivo) return null;
   return {
     sexo: l.sexo,
     idade: l.idade,
@@ -344,7 +447,6 @@ export async function lerPerfil(db: Banco): Promise<Perfil | null> {
 }
 
 export async function salvarPerfil(db: Banco, p: Perfil): Promise<void> {
-  await salvarPeso(db, p.pesoKg);
   await db.runAsync(
     `INSERT INTO perfil (id, sexo, idade, altura_cm, peso_kg, atividade, objetivo, meta_manual)
      VALUES (1, ?, ?, ?, ?, ?, ?, ?)
@@ -489,25 +591,30 @@ export async function registrarExercicio(
     itens?: ItemTreino[];
   },
 ): Promise<void> {
-  const r = await db.runAsync(
-    'INSERT INTO exercicios (data, tipo, intensidade, foco, minutos, distancia_km, kcal, criado_em) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
-    data, e.tipo, e.intensidade, e.foco, e.minutos, e.distanciaKm, e.kcal, agora(),
-  );
-  if (e.itens && e.itens.length > 0) await gravarItens(db, r.lastInsertRowId, e.itens);
+  // Treino e exercícios entram juntos: ou grava tudo, ou não grava nada.
+  await db.withTransactionAsync(async () => {
+    const r = await db.runAsync(
+      'INSERT INTO exercicios (data, tipo, intensidade, foco, minutos, distancia_km, kcal, criado_em) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+      data, e.tipo, e.intensidade, e.foco, e.minutos, e.distanciaKm, e.kcal, agora(),
+    );
+    if (e.itens && e.itens.length > 0) await gravarItens(db, r.lastInsertRowId, e.itens);
+  });
 }
 
 export async function removerExercicio(db: Banco, id: number): Promise<void> {
-  await db.runAsync('DELETE FROM exercicio_itens WHERE exercicio_id = ?', id);
+  // Os exercícios do treino saem junto, pelo ON DELETE CASCADE.
   await db.runAsync('DELETE FROM exercicios WHERE id = ?', id);
 }
 
 /** Desfaz uma remoção: grava o registro de volta com o mesmo id e os exercícios. */
 export async function restaurarExercicio(db: Banco, r: RegistroExercicio): Promise<void> {
-  await db.runAsync(
-    'INSERT INTO exercicios (id, data, tipo, intensidade, foco, minutos, distancia_km, kcal, criado_em) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
-    r.id, r.data, r.tipo, r.intensidade, r.foco, r.minutos, r.distancia_km, r.kcal, r.criado_em,
-  );
-  if (r.itens && r.itens.length > 0) await gravarItens(db, r.id, r.itens);
+  await db.withTransactionAsync(async () => {
+    await db.runAsync(
+      'INSERT INTO exercicios (id, data, tipo, intensidade, foco, minutos, distancia_km, kcal, criado_em) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
+      r.id, r.data, r.tipo, r.intensidade, r.foco, r.minutos, r.distancia_km, r.kcal, r.criado_em,
+    );
+    if (r.itens && r.itens.length > 0) await gravarItens(db, r.id, r.itens);
+  });
 }
 
 // Registros
@@ -644,21 +751,23 @@ export async function salvarRotina(
   minutos: number | null,
   itens: ItemTreino[],
 ): Promise<void> {
-  await db.runAsync('DELETE FROM rotina_itens WHERE dia_semana = ?', diaSemana);
-  await db.runAsync('DELETE FROM rotinas WHERE dia_semana = ?', diaSemana);
-  if (itens.length === 0) return;
+  await db.withTransactionAsync(async () => {
+    // Apagar a rotina leva os exercícios dela junto, pelo ON DELETE CASCADE.
+    await db.runAsync('DELETE FROM rotinas WHERE dia_semana = ?', diaSemana);
+    if (itens.length === 0) return;
 
-  await db.runAsync(
-    'INSERT INTO rotinas (dia_semana, minutos, atualizado_em) VALUES (?, ?, ?)',
-    diaSemana, minutos, agora(),
-  );
-  for (let i = 0; i < itens.length; i++) {
-    const item = itens[i];
     await db.runAsync(
-      'INSERT INTO rotina_itens (dia_semana, catalogo, nome, series, repeticoes, carga_kg, ordem) VALUES (?, ?, ?, ?, ?, ?, ?)',
-      diaSemana, item.catalogo, item.nome, item.series, item.repeticoes, item.cargaKg, i,
+      'INSERT INTO rotinas (dia_semana, minutos, atualizado_em) VALUES (?, ?, ?)',
+      diaSemana, minutos, agora(),
     );
-  }
+    for (let i = 0; i < itens.length; i++) {
+      const item = itens[i];
+      await db.runAsync(
+        'INSERT INTO rotina_itens (dia_semana, catalogo, nome, series, repeticoes, carga_kg, ordem) VALUES (?, ?, ?, ?, ?, ?, ?)',
+        diaSemana, item.catalogo, item.nome, item.series, item.repeticoes, item.cargaKg, i,
+      );
+    }
+  });
 }
 
 export async function lerRotina(db: Banco, diaSemana: number): Promise<Rotina | null> {

@@ -22,6 +22,7 @@ import {
   gastoDoDia,
   gastoTreino,
   INTENSIDADES,
+  itensValidos,
   medidaDoTipo,
   TIPOS,
   volumeCarga,
@@ -255,6 +256,8 @@ function Formulario({
   };
   // Lista aberta e vazia não vale o palpite do modo rápido: seria número sem base.
   const faltaExercicio = comLista && itens.length === 0;
+  // Série ou repetição zerada trava o salvar: o banco recusaria na hora de gravar.
+  const listaIncompleta = comLista && !itensValidos(itens);
   const kcal = faltaExercicio ? 0 : gastoTreino(treino, pesoKg);
   const volume = comLista ? volumeCarga(itens) : 0;
 
@@ -402,7 +405,16 @@ function Formulario({
         }
       />
 
-      <Botao titulo="Salvar treino" desabilitado={kcal <= 0} onPress={() => onSalvar(treino, kcal)} />
+      {listaIncompleta ? (
+        <Text style={[estilos.suave, { textAlign: 'center' }]}>
+          Complete as séries e as repetições de cada exercício.
+        </Text>
+      ) : null}
+      <Botao
+        titulo="Salvar treino"
+        desabilitado={kcal <= 0 || listaIncompleta}
+        onPress={() => onSalvar(treino, kcal)}
+      />
       <Botao titulo="Cancelar" tipo="secundario" onPress={onCancelar} />
     </Cartao>
   );

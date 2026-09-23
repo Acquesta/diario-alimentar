@@ -258,3 +258,112 @@ test('treino antigo continua depois de migrar para a versão 7', async () => {
   assert.equal(treino.kcal, 240);
   assert.deepEqual(await listarDiasComRotina(db), []);
 });
+
+test('versão 8: apagar treino leva os exercícios junto, pela chave estrangeira', async () => {
+  const db = await bancoVazio();
+  await migrar(db);
+  await registrarExercicio(db, '2026-09-23', {
+    tipo: 'musculacao', intensidade: null, foco: null, minutos: 60, distanciaKm: null, kcal: 200,
+    itens: [{ catalogo: 'supino', nome: 'Supino reto', series: 3, repeticoes: 10, cargaKg: 60 }],
+  });
+  const [treino] = await listarExercicios(db, '2026-09-23');
+
+  await db.runAsync('DELETE FROM exercicios WHERE id = ?', treino.id);
+  const sobrou = await db.getAllAsync('SELECT id FROM exercicio_itens');
+  assert.equal(sobrou.length, 0);
+});
+
+test('versão 8: apagar a rotina leva os exercícios dela junto', async () => {
+  const db = await bancoVazio();
+  await migrar(db);
+  await salvarRotina(db, 2, 45, [
+    { catalogo: 'agachamento', nome: 'Agachamento livre', series: 4, repeticoes: 10, cargaKg: 80 },
+  ]);
+  await db.runAsync('DELETE FROM rotinas WHERE dia_semana = ?', 2);
+  const sobrou = await db.getAllAsync('SELECT id FROM rotina_itens');
+  assert.equal(sobrou.length, 0);
+});
+
+test('versão 8: exercício com série zero não entra, e o treino não fica pela metade', async () => {
+  const db = await bancoVazio();
+  await migrar(db);
+  await assert.rejects(() =>
+    registrarExercicio(db, '2026-09-23', {
+      tipo: 'musculacao', intensidade: null, foco: null, minutos: 60, distanciaKm: null, kcal: 200,
+      itens: [{ catalogo: 'supino', nome: 'Supino reto', series: 0, repeticoes: 10, cargaKg: 60 }],
+    }),
+  );
+  // A transação desfez o treino junto com o exercício recusado.
+  assert.deepEqual(await listarExercicios(db, '2026-09-23'), []);
+});
+
+test('versão 8: o peso mora só no perfil, e a chave antiga em config some', async () => {
+  const db = await bancoNaVersao3();
+  await migrar(db);
+  await salvarPeso(db, 82);
+  assert.equal(await lerPeso(db), 82);
+
+  const emConfig = await db.getFirstAsync("SELECT valor FROM config WHERE chave = 'peso_kg'");
+  assert.equal(emConfig, null);
+  const noPerfil = await db.getFirstAsync<{ peso_kg: number }>('SELECT peso_kg FROM perfil WHERE id = 1');
+  assert.equal(noPerfil?.peso_kg, 82);
+});
+
+test('versão 8: peso guardado em config numa versão antiga vai para o perfil', async () => {
+  const db = await bancoVazio();
+  await db.execAsync(`
+    CREATE TABLE config (chave TEXT PRIMARY KEY NOT NULL, valor TEXT NOT NULL);
+    INSERT INTO config (chave, valor) VALUES ('peso_kg', '77.5');
+    PRAGMA user_version = 7;
+  `);
+  // Antes da 8 o app criava as tabelas nas versões anteriores; aqui basta o que a 8 toca.
+  await db.execAsync(`
+    CREATE TABLE perfil (
+      id INTEGER PRIMARY KEY CHECK (id = 1), sexo TEXT NOT NULL, idade INTEGER NOT NULL,
+      altura_cm REAL NOT NULL, peso_kg REAL NOT NULL, atividade TEXT NOT NULL,
+      objetivo TEXT NOT NULL, meta_manual INTEGER
+    );
+    CREATE TABLE pratos (id INTEGER PRIMARY KEY AUTOINCREMENT, nome TEXT NOT NULL);
+    CREATE TABLE prato_itens (
+      id INTEGER PRIMARY KEY AUTOINCREMENT, prato_id INTEGER NOT NULL, origem TEXT NOT NULL,
+      alimento_id INTEGER NOT NULL, nome TEXT NOT NULL, gramas REAL NOT NULL, kcal REAL NOT NULL,
+      proteina REAL NOT NULL, carboidrato REAL NOT NULL, gordura REAL NOT NULL
+    );
+    CREATE TABLE exercicios (
+      id INTEGER PRIMARY KEY AUTOINCREMENT, data TEXT NOT NULL, tipo TEXT NOT NULL, intensidade TEXT,
+      foco TEXT, minutos REAL, distancia_km REAL, kcal REAL NOT NULL, criado_em TEXT NOT NULL
+    );
+    CREATE TABLE exercicio_itens (
+      id INTEGER PRIMARY KEY AUTOINCREMENT, exercicio_id INTEGER NOT NULL, catalogo TEXT,
+      nome TEXT NOT NULL, series INTEGER NOT NULL, repeticoes INTEGER NOT NULL, carga_kg REAL,
+      ordem INTEGER NOT NULL
+    );
+    CREATE TABLE rotinas (dia_semana INTEGER PRIMARY KEY, minutos REAL, atualizado_em TEXT NOT NULL);
+    CREATE TABLE rotina_itens (
+      id INTEGER PRIMARY KEY AUTOINCREMENT, dia_semana INTEGER NOT NULL, catalogo TEXT,
+      nome TEXT NOT NULL, series INTEGER NOT NULL, repeticoes INTEGER NOT NULL, carga_kg REAL,
+      ordem INTEGER NOT NULL
+    );
+    INSERT INTO exercicios (data, tipo, intensidade, foco, minutos, distancia_km, kcal, criado_em)
+      VALUES ('2026-09-22', 'musculacao', 'moderado', NULL, 60, NULL, 240, '2026-09-22 10:00:00');
+    INSERT INTO exercicio_itens (exercicio_id, catalogo, nome, series, repeticoes, carga_kg, ordem)
+      VALUES (1, 'supino', 'Supino reto', 3, 10, 60, 0);
+  `);
+
+  await migrar(db);
+
+  assert.equal(await lerPeso(db), 77.5);
+  assert.equal(await db.getFirstAsync("SELECT valor FROM config WHERE chave = 'peso_kg'"), null);
+  // O treino e o exercício dele continuam lá depois da tabela ser refeita.
+  const [treino] = await listarExercicios(db, '2026-09-22');
+  assert.equal(treino.kcal, 240);
+  assert.deepEqual(treino.itens?.map((i) => i.nome), ['Supino reto']);
+});
+
+test('versão 8: perfil só com peso não vira perfil completo', async () => {
+  const db = await bancoVazio();
+  await migrar(db);
+  await salvarPeso(db, 80);
+  assert.equal(await lerPerfil(db), null);
+  assert.equal(await lerPeso(db), 80);
+});

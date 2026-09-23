@@ -8,6 +8,7 @@ import {
   gastoDetalhado,
   gastoDoDia,
   gastoTreino,
+  itensValidos,
   MET_DESCANSO,
   minutosSobTensao,
   volumeCarga,
@@ -216,4 +217,13 @@ test('meta de água: 35 ml por kg, arredondada para 100 ml', () => {
   assert.equal(metaAgua({ pesoKg: 80 }), 2800);
   assert.equal(metaAgua({ pesoKg: 62 }), 2200);
   assert.equal(metaAgua({ pesoKg: 45.5 }), 1600);
+});
+
+test('série ou repetição zerada invalida o treino', () => {
+  assert.equal(itensValidos([item('supino', 3, 10)]), true);
+  assert.equal(itensValidos([]), true);
+  assert.equal(itensValidos([item('supino', 0, 10)]), false);
+  assert.equal(itensValidos([item('supino', 3, 0)]), false);
+  assert.equal(itensValidos([item('supino', 3, 10, null)]), true);
+  assert.equal(itensValidos([item('supino', 3, 10, -5)]), false);
 });

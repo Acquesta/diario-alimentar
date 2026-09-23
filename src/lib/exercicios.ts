@@ -160,6 +160,14 @@ export function minutosSobTensao(itens: ItemTreino[]): number {
   return segundos / 60;
 }
 
+/**
+ * Série ou repetição zerada não é treino, e o banco recusa desde a versão 8.
+ * A tela usa isto para travar o salvar enquanto a pessoa está editando.
+ */
+export function itensValidos(itens: ItemTreino[]): boolean {
+  return itens.every((i) => i.series > 0 && i.repeticoes > 0 && (i.cargaKg === null || i.cargaKg >= 0));
+}
+
 /** Carga total levantada no treino, em kg. Serve para acompanhar a evolução. */
 export function volumeCarga(itens: ItemTreino[]): number {
   return Math.round(itens.reduce((total, i) => total + repeticoesDoItem(i) * (i.cargaKg ?? 0), 0));

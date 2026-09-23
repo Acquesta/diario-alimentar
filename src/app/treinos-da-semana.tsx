@@ -5,7 +5,7 @@ import { ListaExercicios } from '@/components/lista-exercicios';
 import { useBanco } from '@/lib/banco';
 import { nomeDiaDaSemana } from '@/lib/dates';
 import { apagarRotina, lerRotina, salvarRotina } from '@/lib/db';
-import { type ItemTreino } from '@/lib/exercicios';
+import { itensValidos, type ItemTreino } from '@/lib/exercicios';
 
 /** A semana começa na segunda, como quem monta treino costuma pensar. */
 const DIAS = [1, 2, 3, 4, 5, 6, 0];
@@ -123,9 +123,12 @@ export default function TelaTreinosDaSemana() {
                   accessibilityLabel={`Duração do treino de ${nomeDiaDaSemana(dia)}`}
                 />
 
+                {!itensValidos(rascunho.itens) ? (
+                  <Text style={estilos.suave}>Complete as séries e as repetições de cada exercício.</Text>
+                ) : null}
                 <Botao
                   titulo={`Salvar treino de ${nomeDiaDaSemana(dia)}`}
-                  desabilitado={rascunho.itens.length === 0}
+                  desabilitado={rascunho.itens.length === 0 || !itensValidos(rascunho.itens)}
                   onPress={() => salvar(dia)}
                 />
                 {rascunho.itens.length > 0 ? (

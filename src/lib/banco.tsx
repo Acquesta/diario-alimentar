@@ -82,6 +82,7 @@ async function abrirBanco(): Promise<Omit<Estado, 'aoAlterar'>> {
   if (Platform.OS !== 'web') {
     const banco = await openDatabaseAsync(NOME_BANCO);
     await migrar(banco);
+    await ligarChaveEstrangeira(banco);
     return { banco, tipo: 'sqlite' };
   }
 
@@ -89,6 +90,7 @@ async function abrirBanco(): Promise<Omit<Estado, 'aoAlterar'>> {
     try {
       const banco = await comLimite(openDatabaseAsync(NOME_BANCO), LIMITE_ABERTURA_MS);
       await comLimite(migrar(banco), LIMITE_ABERTURA_MS);
+      await ligarChaveEstrangeira(banco);
       return { banco, tipo: 'sqlite' };
     } catch (e) {
       console.warn('expo-sqlite não abriu na web; usando o plano B (IndexedDB).', e);
@@ -98,7 +100,17 @@ async function abrirBanco(): Promise<Omit<Estado, 'aoAlterar'>> {
   const { abrirBancoIndexedDb } = await import('./banco-web');
   const banco = await abrirBancoIndexedDb(NOME_BANCO);
   await migrar(banco);
+  await ligarChaveEstrangeira(banco);
   return { banco, tipo: 'indexeddb' };
+}
+
+/**
+ * O SQLite abre com a checagem de chave estrangeira desligada, e ela não fica
+ * guardada no arquivo: é por conexão. Sem isto, apagar um treino deixaria os
+ * exercícios dele órfãos no banco.
+ */
+async function ligarChaveEstrangeira(banco: Banco): Promise<void> {
+  await banco.execAsync('PRAGMA foreign_keys = ON');
 }
 
 /** O expo-sqlite na web exige SharedArrayBuffer (isolamento de origem) e OPFS. */
