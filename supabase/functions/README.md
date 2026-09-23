@@ -22,6 +22,7 @@ fora do servidor.
 | `GEMINI_API_KEY` | Chave do Gemini, de https://aistudio.google.com/apikey |
 | `GEMINI_MODELOS` | Opcional. Lista de modelos separados por vírgula, na ordem de preferência. Padrão: `gemini-3.5-flash-lite,gemini-3.8-flash,gemini-3.6-flash` |
 | `GEMINI_MODELO` | Nome antigo, com um modelo só. Ainda funciona, mas `GEMINI_MODELOS` vem antes |
+| `TETO_DIARIO` | Opcional. Quantas fotos cada pessoa manda por dia. Padrão: 30 |
 | `TETO_MENSAL` | Opcional. Quantas fotos o app inteiro aceita por mês, somando todo mundo. Padrão: 2000. `0` desliga o teto |
 
 `SUPABASE_URL` e `SUPABASE_SERVICE_ROLE_KEY` já vêm prontos no ambiente das funções.
@@ -41,7 +42,7 @@ Ao mudar uma função, mude aqui e publique; o que vale é a versão publicada.
 
 São dois tetos, os dois contados na tabela `usos_ia`:
 
-- **Por pessoa:** 20 fotos por dia. Quem conta é a função `registrar_uso_ia`, no
+- **Por pessoa:** `TETO_DIARIO` fotos por dia, padrão 30. Quem conta é a função `registrar_uso_ia`, no
   banco, que desfaz a contagem quando recusa, para o pedido recusado não gastar cota.
 - **Do app inteiro:** `TETO_MENSAL` fotos por mês, somando todo mundo, conferido
   pela função `uso_ia_do_mes` antes de contar o uso da pessoa.

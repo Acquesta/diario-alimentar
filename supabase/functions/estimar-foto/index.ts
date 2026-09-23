@@ -9,8 +9,8 @@ const cors = {
   "Access-Control-Allow-Methods": "POST, OPTIONS",
 };
 
-/** Quantas fotos cada pessoa pode mandar por dia. */
-const TETO_DIARIO = 20;
+/** Quantas fotos cada pessoa pode mandar por dia. Muda pelo segredo TETO_DIARIO. */
+const TETO_DIARIO = Number(Deno.env.get("TETO_DIARIO") ?? 30);
 /**
  * Teto do app inteiro no mes, somando todo mundo. Com cobranca ligada na chave,
  * o Google avisa o gasto mas nao corta nada, entao quem segura e este numero.

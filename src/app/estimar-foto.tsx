@@ -143,7 +143,7 @@ export default function TelaEstimarFoto() {
             A IA olha a foto e estima o que tem no prato e quanto. Você confere e corrige tudo antes de registrar.
           </Text>
           <Text style={estilos.suave}>
-            A foto vai para o servidor só para essa estimativa, e não fica guardada. São até 20 fotos por dia.
+            A foto vai para o servidor só para essa estimativa, e não fica guardada. São até 30 fotos por dia.
           </Text>
           <Botao titulo="Tirar foto" desabilitado={pensando} onPress={() => escolher('camera')} />
           <Botao
