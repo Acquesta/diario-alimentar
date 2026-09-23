@@ -2,22 +2,25 @@ import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { voltar } from '@/lib/navegacao';
 import { useBanco } from '@/lib/banco';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { FlatList, Pressable, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, FlatList, Pressable, Text, TextInput, View } from 'react-native';
 import { Botao, Cartao, Chip, formatar, useTema } from '@/components/ui';
 import { hoje } from '@/lib/dates';
 import {
+  criarPersonalizado,
   desfavoritar,
   favoritar,
   listarFavoritos,
   listarPersonalizados,
   listarPratos,
   maisUsados,
+  personalizadoPorCodigo,
   registrar,
   registrarPrato,
   type Favorito,
   type Prato,
 } from '@/lib/db';
-import { ALIMENTOS_TACO, chave, nomeRefeicao, REFEICOES, type Alimento, type Refeicao } from '@/lib/foods';
+import { ALIMENTOS_BASE, chave, nomeRefeicao, NOME_ORIGEM, REFEICOES, type Alimento, type Refeicao } from '@/lib/foods';
+import { alimentoDoProduto, buscarPorNome, type Produto } from '@/lib/openfoodfacts';
 import { porcao, somar } from '@/lib/nutrition';
 import { buscar } from '@/lib/search';
 
@@ -39,6 +42,9 @@ export default function Adicionar() {
   const [recentes, setRecentes] = useState<Favorito[]>([]);
   const [pratos, setPratos] = useState<Prato[]>([]);
   const [selecionado, setSelecionado] = useState<Sugestao | null>(null);
+  const [online, setOnline] = useState<{ termo: string; produtos: Produto[] } | null>(null);
+  const [procurandoOnline, setProcurandoOnline] = useState(false);
+  const [erroOnline, setErroOnline] = useState<string | null>(null);
 
   useFocusEffect(
     useCallback(() => {
@@ -61,13 +67,13 @@ export default function Adicionar() {
   const jaEscolheu = useRef(false);
   useEffect(() => {
     if (!params.escolher || jaEscolheu.current) return;
-    const alimento = [...personalizados, ...ALIMENTOS_TACO].find((a) => chave(a) === params.escolher);
+    const alimento = [...personalizados, ...ALIMENTOS_BASE].find((a) => chave(a) === params.escolher);
     if (!alimento) return;
     jaEscolheu.current = true;
     setSelecionado({ alimento, gramas: 100 });
   }, [params.escolher, personalizados]);
 
-  const todos = useMemo(() => [...personalizados, ...ALIMENTOS_TACO], [personalizados]);
+  const todos = useMemo(() => [...personalizados, ...ALIMENTOS_BASE], [personalizados]);
   const porChave = useMemo(() => new Map(todos.map((a) => [chave(a), a])), [todos]);
   const favoritosSet = useMemo(() => new Set(favoritos.map((f) => `${f.origem}:${f.alimentoId}`)), [favoritos]);
 
@@ -76,6 +82,34 @@ export default function Adicionar() {
       const alimento = porChave.get(`${f.origem}:${f.alimentoId}`);
       return alimento ? [{ alimento, gramas: f.gramas }] : [];
     });
+
+  /** Produto de marca encontrado na internet vira alimento salvo no aparelho. */
+  const usarProduto = async (produto: Produto) => {
+    const salvo = await personalizadoPorCodigo(db, produto.codigo);
+    const alimento =
+      salvo ??
+      (await criarPersonalizado(db, {
+        nome: alimentoDoProduto(produto, 0).nome,
+        kcal: produto.kcal,
+        proteina: produto.proteina,
+        carboidrato: produto.carboidrato,
+        gordura: produto.gordura,
+        codigoBarras: produto.codigo,
+      }));
+    setPersonalizados(await listarPersonalizados(db));
+    setSelecionado({ alimento, gramas: 100 });
+  };
+
+  const procurarOnline = async () => {
+    const termo = consulta.trim();
+    setProcurandoOnline(true);
+    setErroOnline(null);
+    const r = await buscarPorNome(termo);
+    setProcurandoOnline(false);
+    if (r.tipo === 'achados') setOnline({ termo, produtos: r.produtos });
+    else if (r.tipo === 'vazio') setErroOnline(`Nenhum produto de marca para “${termo}”.`);
+    else setErroOnline('Sem conexão com a internet para procurar produtos de marca.');
+  };
 
   const resultados: Sugestao[] = consulta.trim()
     ? buscar(todos, consulta).map((alimento) => ({ alimento, gramas: 100 }))
@@ -116,7 +150,11 @@ export default function Adicionar() {
           placeholder="Buscar alimento, ex.: arroz, frango…"
           placeholderTextColor={cores.suave}
           value={consulta}
-          onChangeText={setConsulta}
+          onChangeText={(t) => {
+            setConsulta(t);
+            setOnline(null);
+            setErroOnline(null);
+          }}
           autoCorrect={false}
           accessibilityLabel="Buscar alimento"
         />
@@ -144,7 +182,8 @@ export default function Adicionar() {
               <Lista titulo="Usados recentemente" itens={sugestoesRecentes} onEscolher={setSelecionado} />
               {sugestoesFavoritos.length === 0 && sugestoesRecentes.length === 0 ? (
                 <Text style={estilos.suave}>
-                  Busque pelo nome. A base tem {ALIMENTOS_TACO.length} alimentos da tabela brasileira TACO.
+                  Busque pelo nome. São {ALIMENTOS_BASE.length} alimentos: pratos prontos da tabela do IBGE e
+                  ingredientes da TACO.
                 </Text>
               ) : null}
             </View>
@@ -155,6 +194,15 @@ export default function Adicionar() {
         }
         ListFooterComponent={
           <View style={{ marginTop: 8, gap: 8 }}>
+            {consulta.trim().length >= 3 ? (
+              <ProdutosDeMarca
+                produtos={online?.termo === consulta.trim() ? online.produtos : null}
+                procurando={procurandoOnline}
+                erro={erroOnline}
+                onProcurar={procurarOnline}
+                onEscolher={usarProduto}
+              />
+            ) : null}
             <Botao
               titulo="Ler código de barras"
               tipo="secundario"
@@ -168,6 +216,63 @@ export default function Adicionar() {
           </View>
         }
       />
+    </View>
+  );
+}
+
+/** Busca no Open Food Facts, para quando a base local não tem o produto. */
+function ProdutosDeMarca({
+  produtos,
+  procurando,
+  erro,
+  onProcurar,
+  onEscolher,
+}: {
+  produtos: Produto[] | null;
+  procurando: boolean;
+  erro: string | null;
+  onProcurar: () => void;
+  onEscolher: (p: Produto) => void;
+}) {
+  const { cores, estilos } = useTema();
+
+  if (procurando) {
+    return (
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 8 }}>
+        <ActivityIndicator color={cores.primaria} />
+        <Text style={estilos.suave}>Procurando produtos de marca…</Text>
+      </View>
+    );
+  }
+
+  if (produtos) {
+    return (
+      <View style={{ gap: 8 }}>
+        <Text style={[estilos.suave, { fontWeight: '600' }]}>Produtos de marca</Text>
+        {produtos.map((p) => (
+          <Pressable
+            key={p.codigo}
+            onPress={() => onEscolher(p)}
+            accessibilityRole="button"
+            style={({ pressed }) => [estilos.cartao, { paddingVertical: 12, gap: 2 }, pressed && { opacity: 0.7 }]}
+          >
+            <Text style={estilos.texto}>{p.marca ? `${p.nome} (${p.marca})` : p.nome}</Text>
+            <Text style={estilos.suave}>
+              100 g · {p.kcal} kcal · Open Food Facts
+            </Text>
+          </Pressable>
+        ))}
+        <Text style={estilos.suave}>
+          Confira com o rótulo: a base é aberta e às vezes tem valor errado. O escolhido fica salvo no aparelho.
+        </Text>
+      </View>
+    );
+  }
+
+  return (
+    <View style={{ gap: 8 }}>
+      {erro ? <Text style={estilos.suave}>{erro}</Text> : null}
+      <Botao titulo="Procurar em produtos de marca" tipo="secundario" onPress={onProcurar} />
     </View>
   );
 }
@@ -255,7 +360,7 @@ function Linha({ sugestao, onPress }: { sugestao: Sugestao; onPress: () => void 
     >
       <Text style={estilos.texto}>{alimento.nome}</Text>
       <Text style={estilos.suave}>
-        {formatar(gramas)} g · {m.kcal} kcal · {alimento.categoria}
+        {formatar(gramas)} g · {m.kcal} kcal · {alimento.categoria} · {NOME_ORIGEM[alimento.origem]}
       </Text>
     </Pressable>
   );

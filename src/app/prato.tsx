@@ -5,7 +5,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { Pressable, ScrollView, Text, TextInput, View } from 'react-native';
 import { Botao, Cartao, formatar, useTema } from '@/components/ui';
 import { itensDaRefeicao, listarPersonalizados, listarPratos, removerPrato, salvarPrato, type ItemPrato } from '@/lib/db';
-import { ALIMENTOS_TACO, chave, nomeRefeicao, REFEICOES, type Alimento, type Refeicao } from '@/lib/foods';
+import { ALIMENTOS_BASE, chave, nomeRefeicao, REFEICOES, type Alimento, type Refeicao } from '@/lib/foods';
 import { porcao, somar } from '@/lib/nutrition';
 import { buscar } from '@/lib/search';
 
@@ -45,7 +45,7 @@ export default function TelaPrato() {
     })();
   }, [db, id, params.data, params.refeicao]);
 
-  const todos = useMemo(() => [...personalizados, ...ALIMENTOS_TACO], [personalizados]);
+  const todos = useMemo(() => [...personalizados, ...ALIMENTOS_BASE], [personalizados]);
   const resultados = consulta.trim() ? buscar(todos, consulta, 8) : [];
 
   const gramasDe = (t: string) => Number(t.replace(',', '.'));

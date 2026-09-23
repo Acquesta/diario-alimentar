@@ -42,3 +42,6 @@ yarn-error.*
 
 # Vercel
 .vercel
+
+# Planilhas baixadas para gerar as bases de alimentos
+scripts/dados/
