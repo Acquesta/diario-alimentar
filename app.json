@@ -11,7 +11,7 @@
     },
     "android": {
       "adaptiveIcon": {
-        "backgroundColor": "#E6F4FE",
+        "backgroundColor": "#11201A",
         "foregroundImage": "./assets/android-icon-foreground.png",
         "backgroundImage": "./assets/android-icon-background.png",
         "monochromeImage": "./assets/android-icon-monochrome.png"
@@ -25,7 +25,7 @@
       "name": "Diário Alimentar",
       "shortName": "Diário",
       "themeColor": "#2F7D5B",
-      "backgroundColor": "#F6F7F4"
+      "backgroundColor": "#11201A"
     },
     "plugins": [
       [
@@ -37,7 +37,19 @@
           }
         }
       ],
-      "expo-sqlite"
+      "expo-sqlite",
+      [
+        "expo-splash-screen",
+        {
+          "image": "./assets/splash-icon.png",
+          "imageWidth": 200,
+          "resizeMode": "contain",
+          "backgroundColor": "#F6F7F4",
+          "dark": {
+            "backgroundColor": "#0F1412"
+          }
+        }
+      ]
     ],
     "scheme": "diarioalimentar",
     "experiments": {
