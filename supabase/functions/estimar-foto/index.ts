@@ -18,14 +18,17 @@ const LIMITE_IMAGEM = 4 * 1024 * 1024;
  * Da para trocar a lista pelo segredo GEMINI_MODELOS, separando por virgula.
  */
 const MODELOS = (Deno.env.get("GEMINI_MODELOS") ?? Deno.env.get("GEMINI_MODELO") ??
-  "gemini-3.5-flash-lite,gemini-3.6-flash,gemini-3.8-flash")
+  "gemini-3.5-flash-lite,gemini-3.8-flash,gemini-3.6-flash")
   .split(",").map((m) => m.trim()).filter(Boolean);
 /** Quanto esperar por uma tentativa. Sem isso a chamada fica pendurada. */
-const TEMPO_TENTATIVA_MS = 35_000;
+const TEMPO_TENTATIVA_MS = 30_000;
 /** Teto somando todas as tentativas. O worker do Supabase morre aos 150 s. */
 const ORCAMENTO_MS = 110_000;
-/** Quantas voltas na lista de modelos. */
-const RODADAS = 2;
+/**
+ * Quantas voltas na lista de modelos. Fila cheia costuma passar em segundos, e
+ * o 503 volta rapido, entao vale insistir enquanto o orcamento de tempo permitir.
+ */
+const RODADAS = 8;
 
 const INSTRUCAO = `Voce recebe a foto de um prato de comida brasileiro.
 Liste os alimentos que aparecem, com a quantidade estimada em gramas e os valores
@@ -159,8 +162,9 @@ Deno.serve(async (req: Request) => {
   for (let rodada = 0; rodada < RODADAS; rodada++) {
     for (const modelo of MODELOS) {
       if (semModelo.has(modelo)) continue;
-      if (restante() < 5_000) break busca;
-      if (tentativas.length > 0) await espera(rodada === 0 ? 300 : 2_000);
+      if (restante() < 6_000) break busca;
+      // Espera crescente entre tentativas, ate 5 s, para dar tempo da fila andar.
+      if (tentativas.length > 0) await espera(Math.min(5_000, 300 + rodada * 1_200));
 
       const t0 = Date.now();
       try {
@@ -183,8 +187,9 @@ Deno.serve(async (req: Request) => {
         }
         const detalhe = await r.text();
         console.error("gemini", modelo, r.status, detalhe.slice(0, 300));
-        // 404 e o modelo que saiu do ar; 400 e 403 sao pedido ou chave ruim.
-        if (r.status === 404) semModelo.add(modelo);
+        // 404 saiu do ar; 429 e cota do dia, que nao volta em um minuto. Os dois
+        // ficam de fora do resto da busca. 400 e 403 sao pedido ou chave ruim.
+        if (r.status === 404 || r.status === 429) semModelo.add(modelo);
         if (r.status === 400 || r.status === 403) break busca;
       } catch (e) {
         // Estouro do tempo da tentativa cai aqui: o proximo modelo assume.

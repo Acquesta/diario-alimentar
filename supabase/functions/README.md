@@ -20,7 +20,7 @@ fora do servidor.
 | Nome | Para quê |
 |---|---|
 | `GEMINI_API_KEY` | Chave do Gemini, de https://aistudio.google.com/apikey |
-| `GEMINI_MODELOS` | Opcional. Lista de modelos separados por vírgula, na ordem de preferência. Padrão: `gemini-3.5-flash-lite,gemini-3.6-flash,gemini-3.8-flash` |
+| `GEMINI_MODELOS` | Opcional. Lista de modelos separados por vírgula, na ordem de preferência. Padrão: `gemini-3.5-flash-lite,gemini-3.8-flash,gemini-3.6-flash` |
 | `GEMINI_MODELO` | Nome antigo, com um modelo só. Ainda funciona, mas `GEMINI_MODELOS` vem antes |
 
 `SUPABASE_URL` e `SUPABASE_SERVICE_ROLE_KEY` já vêm prontos no ambiente das funções.
@@ -44,9 +44,10 @@ contagem quando recusa, para o pedido recusado não gastar cota.
 
 ## Quando a IA não responde
 
-`estimar-foto` percorre a lista de modelos até um responder, duas vezes. Cada
-tentativa tem 35 s, e o conjunto todo para em 110 s, antes do limite de 150 s do
-worker do Supabase. Sem esses cortes a chamada ficava pendurada e o app devolvia
+`estimar-foto` percorre a lista de modelos até um responder, até oito voltas com
+espera crescente. Cada tentativa tem 30 s, e o conjunto todo para em 110 s, antes
+do limite de 150 s do worker do Supabase. Modelo que devolve 404 ou 429 sai da
+busca: um não existe mais, o outro só volta quando a cota do dia virar. Sem esses cortes a chamada ficava pendurada e o app devolvia
 `WORKER_RESOURCE_LIMIT` depois de dois minutos e meio.
 
 A resposta de erro traz `tentativas`, com o modelo, o status e o tempo de cada
