@@ -79,6 +79,7 @@ function Navegacao() {
         <Stack.Screen name="adicionar" options={{ title: 'Adicionar alimento' }} />
         <Stack.Screen name="novo-alimento" options={{ title: 'Novo alimento' }} />
         <Stack.Screen name="codigo-barras" options={{ title: 'Código de barras' }} />
+        <Stack.Screen name="estimar-foto" options={{ title: 'Foto do prato' }} />
         <Stack.Screen name="prato" options={{ title: 'Prato' }} />
         <Stack.Screen name="privacidade" options={{ title: 'Privacidade' }} />
         <Stack.Screen name="apagar-conta" options={{ title: 'Apagar conta e dados' }} />

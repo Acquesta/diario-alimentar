@@ -204,6 +204,11 @@ export default function Adicionar() {
               />
             ) : null}
             <Botao
+              titulo="Estimar por foto"
+              tipo="secundario"
+              onPress={() => router.push({ pathname: '/estimar-foto', params: { data, refeicao } })}
+            />
+            <Botao
               titulo="Ler código de barras"
               tipo="secundario"
               onPress={() => router.push({ pathname: '/codigo-barras', params: { data, refeicao } })}
