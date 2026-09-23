@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { alimentoDoProduto, codigoValido, converter } from './openfoodfacts.ts';
+import { alimentoDoProduto, codigoValido, converter, converterBusca } from './openfoodfacts.ts';
 
 const resposta = (produto: Record<string, unknown>) => ({ status: 1, product: produto });
 
@@ -65,4 +65,33 @@ test('código de barras válido', () => {
   assert.ok(codigoValido('12345678'));
   assert.ok(!codigoValido('123'));
   assert.ok(!codigoValido('789100010010a'));
+});
+
+const nutrientes = (kcal: number) => ({ 'energy-kcal_100g': kcal, proteins_100g: 3, carbohydrates_100g: 10, fat_100g: 1 });
+
+test('busca por nome devolve os produtos que têm calorias', () => {
+  const r = converterBusca({
+    products: [
+      { code: '111', product_name: 'Biscoito recheado', brands: 'Marca A', nutriments: nutrientes(480) },
+      { code: '222', product_name: 'Produto sem dados', nutriments: {} },
+      { code: '333', product_name_pt: 'Pão de forma', brands: 'Marca B, Outra', nutriments: nutrientes(266) },
+    ],
+  });
+  assert.equal(r.tipo, 'achados');
+  if (r.tipo !== 'achados') return;
+  assert.equal(r.produtos.length, 2);
+  assert.deepEqual(r.produtos.map((p) => p.nome), ['Biscoito recheado', 'Pão de forma']);
+  assert.equal(r.produtos[1].marca, 'Marca B');
+  assert.equal(r.produtos[0].codigo, '111');
+});
+
+test('busca por nome sem resultado aproveitável', () => {
+  assert.equal(converterBusca({ products: [] }).tipo, 'vazio');
+  assert.equal(converterBusca({ products: [{ code: '1', product_name: 'Sem caloria', nutriments: {} }] }).tipo, 'vazio');
+  assert.equal(converterBusca(null).tipo, 'vazio');
+});
+
+test('produto da busca sem código é descartado', () => {
+  const r = converterBusca({ products: [{ product_name: 'Sem código', nutriments: nutrientes(100) }] });
+  assert.equal(r.tipo, 'vazio');
 });
