@@ -18,6 +18,8 @@ export const TABELAS = [
   'agua',
   'exercicios',
   'exercicio_itens',
+  'rotinas',
+  'rotina_itens',
 ] as const;
 
 export type Tabela = (typeof TABELAS)[number];

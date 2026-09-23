@@ -3,8 +3,11 @@ import assert from 'node:assert/strict';
 import initSqlJs from 'sql.js';
 import { BancoSqlJs } from './banco-web.ts';
 import {
+  apagarRotina,
   lerPerfil,
   lerPeso,
+  lerRotina,
+  listarDiasComRotina,
   listarAgua,
   listarExercicios,
   migrar,
@@ -13,6 +16,7 @@ import {
   restaurarExercicio,
   salvarPerfil,
   salvarPeso,
+  salvarRotina,
   VERSAO,
 } from './db.ts';
 import type { Banco } from './banco-tipos.ts';
@@ -198,4 +202,59 @@ test('treino sem lista de exercícios vem sem itens', async () => {
   });
   const [treino] = await listarExercicios(db, '2026-09-23');
   assert.deepEqual(treino.itens, []);
+});
+
+test('rotina do dia da semana guarda, lê e troca', async () => {
+  const db = await bancoVazio();
+  await migrar(db);
+  const segunda = [
+    { catalogo: 'agachamento', nome: 'Agachamento livre', series: 4, repeticoes: 10, cargaKg: 80 },
+    { catalogo: 'leg-press', nome: 'Leg press', series: 3, repeticoes: 12, cargaKg: 120 },
+  ];
+  await salvarRotina(db, 1, 60, segunda);
+
+  const lida = await lerRotina(db, 1);
+  assert.equal(lida?.minutos, 60);
+  assert.deepEqual(lida?.itens, segunda);
+  assert.deepEqual(await listarDiasComRotina(db), [1]);
+  assert.equal(await lerRotina(db, 2), null);
+
+  // Salvar de novo troca a rotina inteira, sem duplicar exercício.
+  await salvarRotina(db, 1, 45, [segunda[0]]);
+  const trocada = await lerRotina(db, 1);
+  assert.equal(trocada?.itens.length, 1);
+  assert.equal(trocada?.minutos, 45);
+});
+
+test('apagar rotina some com o dia da lista', async () => {
+  const db = await bancoVazio();
+  await migrar(db);
+  await salvarRotina(db, 3, 40, [{ catalogo: 'supino', nome: 'Supino reto', series: 3, repeticoes: 10, cargaKg: 60 }]);
+  await apagarRotina(db, 3);
+  assert.equal(await lerRotina(db, 3), null);
+  assert.deepEqual(await listarDiasComRotina(db), []);
+});
+
+test('rotina sem exercício não é guardada', async () => {
+  const db = await bancoVazio();
+  await migrar(db);
+  await salvarRotina(db, 5, 30, []);
+  assert.equal(await lerRotina(db, 5), null);
+});
+
+test('treino antigo continua depois de migrar para a versão 7', async () => {
+  const db = await bancoNaVersao3();
+  await migrar(db);
+  await registrarExercicio(db, '2026-09-23', {
+    tipo: 'musculacao',
+    intensidade: 'moderado',
+    foco: 'composto',
+    minutos: 60,
+    distanciaKm: null,
+    kcal: 240,
+  });
+  await migrar(db);
+  const [treino] = await listarExercicios(db, '2026-09-23');
+  assert.equal(treino.kcal, 240);
+  assert.deepEqual(await listarDiasComRotina(db), []);
 });

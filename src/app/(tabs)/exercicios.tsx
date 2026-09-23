@@ -3,13 +3,16 @@ import { useCallback, useEffect, useState } from 'react';
 import { Pressable, ScrollView, Text, TextInput, View } from 'react-native';
 import { AvisoDesfazer, Botao, Cartao, Chip, formatar, useTema } from '@/components/ui';
 import { useAoAlterar, useBanco } from '@/lib/banco';
-import { hoje, rotulo, somarDias } from '@/lib/dates';
+import { diaDaSemana, hoje, nomeDiaDaSemana, rotulo, somarDias } from '@/lib/dates';
 import {
   lerPeso,
+  lerRotina,
+  listarDiasComRotina,
   listarExercicios,
   registrarExercicio,
   removerExercicio,
   restaurarExercicio,
+  salvarRotina,
   type RegistroExercicio,
 } from '@/lib/db';
 import {
@@ -104,6 +107,7 @@ export default function TelaExercicios() {
           </Cartao>
         ) : registrando ? (
           <Formulario
+            data={data}
             pesoKg={pesoKg}
             onCancelar={() => setRegistrando(false)}
             onSalvar={async (treino, kcal) => {
@@ -182,10 +186,12 @@ export default function TelaExercicios() {
 }
 
 function Formulario({
+  data,
   pesoKg,
   onSalvar,
   onCancelar,
 }: {
+  data: string;
   pesoKg: number;
   onSalvar: (treino: Treino, kcal: number) => void;
   onCancelar: () => void;
@@ -199,6 +205,33 @@ function Formulario({
   const [kcalTexto, setKcalTexto] = useState('');
   const [detalhado, setDetalhado] = useState(true);
   const [itens, setItens] = useState<ItemTreino[]>([]);
+  const [diasComRotina, setDiasComRotina] = useState<number[]>([]);
+  const [avisoRotina, setAvisoRotina] = useState<string | null>(null);
+
+  const db = useBanco();
+  const diaDaData = diaDaSemana(data);
+  const nomeDoDia = nomeDiaDaSemana(diaDaData);
+
+  const carregarDias = useCallback(async () => setDiasComRotina(await listarDiasComRotina(db)), [db]);
+  useEffect(() => {
+    carregarDias();
+  }, [carregarDias]);
+
+  /** Sobe a rotina daquele dia da semana para a lista, para ele só conferir. */
+  const usarRotina = async (dia: number) => {
+    const rotina = await lerRotina(db, dia);
+    if (!rotina) return;
+    setItens(rotina.itens);
+    if (rotina.minutos) setMinutos(String(rotina.minutos));
+    setAvisoRotina(`Treino de ${nomeDiaDaSemana(dia)} carregado. Confira antes de salvar.`);
+  };
+
+  /** Guarda a lista de agora como o treino daquele dia da semana. */
+  const guardarRotina = async () => {
+    await salvarRotina(db, diaDaData, Number(minutos.replace(',', '.')) || null, itens);
+    await carregarDias();
+    setAvisoRotina(`Este virou o seu treino de ${nomeDoDia}.`);
+  };
 
   const medida = medidaDoTipo(tipo);
   const n = (t: string) => Number(t.replace(',', '.'));
@@ -234,7 +267,38 @@ function Formulario({
             <Chip texto="Só o tempo" ativo={!detalhado} onPress={() => setDetalhado(false)} />
           </View>
           {detalhado ? (
-            <ListaExercicios itens={itens} onMudar={setItens} />
+            <>
+              {diasComRotina.length > 0 ? (
+                <>
+                  <Text style={estilos.suave}>Repetir um treino salvo</Text>
+                  <View style={{ flexDirection: 'row', gap: 6, flexWrap: 'wrap' }}>
+                    {diasComRotina.map((d) => (
+                      <Chip
+                        key={d}
+                        texto={d === diaDaData ? `${maiuscula(nomeDoDia)} (hoje)` : maiuscula(nomeDiaDaSemana(d))}
+                        ativo={false}
+                        onPress={() => usarRotina(d)}
+                      />
+                    ))}
+                  </View>
+                </>
+              ) : null}
+
+              <ListaExercicios itens={itens} onMudar={setItens} />
+
+              {itens.length > 0 ? (
+                <Botao
+                  titulo={
+                    diasComRotina.includes(diaDaData)
+                      ? `Atualizar treino de ${nomeDoDia}`
+                      : `Salvar como treino de ${nomeDoDia}`
+                  }
+                  tipo="secundario"
+                  onPress={guardarRotina}
+                />
+              ) : null}
+              {avisoRotina ? <Text style={estilos.suave}>{avisoRotina}</Text> : null}
+            </>
           ) : (
             <>
               <Text style={estilos.suave}>O que o treino puxou mais</Text>
@@ -251,12 +315,18 @@ function Formulario({
 
       {medida === 'tempo' ? (
         <>
-          <Text style={estilos.suave}>Intensidade</Text>
-          <View style={{ flexDirection: 'row', gap: 6 }}>
-            {INTENSIDADES.map((i) => (
-              <Chip key={i.id} texto={i.nome} ativo={intensidade === i.id} onPress={() => setIntensidade(i.id)} />
-            ))}
-          </View>
+          {/* Com a lista de exercícios a intensidade não muda nada: quem manda são
+              as séries e o descanso. Só aparece no modo rápido, para não enganar. */}
+          {!comLista ? (
+            <>
+              <Text style={estilos.suave}>Intensidade</Text>
+              <View style={{ flexDirection: 'row', gap: 6 }}>
+                {INTENSIDADES.map((i) => (
+                  <Chip key={i.id} texto={i.nome} ativo={intensidade === i.id} onPress={() => setIntensidade(i.id)} />
+                ))}
+              </View>
+            </>
+          ) : null}
           <Text style={estilos.suave}>Duração em minutos</Text>
           <TextInput
             style={estilos.input}
@@ -325,6 +395,8 @@ function Formulario({
     </Cartao>
   );
 }
+
+const maiuscula = (t: string) => t.charAt(0).toUpperCase() + t.slice(1);
 
 /** Lista de exercícios do treino: o que foi feito, com séries, repetições e carga. */
 function ListaExercicios({ itens, onMudar }: { itens: ItemTreino[]; onMudar: (itens: ItemTreino[]) => void }) {
